@@ -19,14 +19,24 @@ blindadas por `import-linter`.
 - [x] Toolchain: `uv`, `ruff`, `mypy --strict`, `pytest`.
 - [x] Docker Compose con PostgreSQL 16.
 - [x] Docs §12 creados.
-- [ ] **Sign-off** (pendiente de verificación verde de todo el toolchain).
+- [x] Tablas reguladas 2020 (RV/CB/B/MI) extraídas y validadas a `data/mortalidad/`.
+- [x] **Sign-off** — toolchain en verde, commit `a772c5d` (2026-06-29).
 
-### Vista de halcón (a completar en el sign-off)
+### Vista de halcón (respondida en el sign-off)
 
-- ¿El `import-linter` falla si alguien mete `import numpy` en `domain/`? → verificar.
-- ¿`mypy --strict` pasa sin `Any` ocultos en el dominio?
-- ¿El contrato `TrayectoriaDeRiqueza` es suficiente para que acumulación se enchufe sin
-  tocar des-acumulación? (revisar en Fase 4, anotado).
+- **¿El `import-linter` falla si alguien mete `import numpy` en `domain/`?** ✅ Verificado
+  en vivo: se inyectó `import numpy` en `domain/services/metricas.py` y el contrato
+  "Dominio puro" rompió (`cauce.domain is not allowed to import numpy`). El blindaje de
+  ADR-010 no es decorativo.
+- **¿`mypy --strict` pasa sin `Any` ocultos en el dominio?** ✅ 36 archivos, 0 issues.
+- **¿El contrato `TrayectoriaDeRiqueza` es suficiente para enchufar acumulación sin tocar
+  des-acumulación?** ⏳ Diseñado para ello (frontera generar/evaluar); la prueba real es
+  la Fase 4 — anotado como caso C-19 en `CASES.md`.
+- **Riesgo abierto detectado:** la fórmula de proyección `q_x → q_{x,t}` vía `AA_{x,t}`
+  aún no está implementada (vive en la nota técnica del Anexo N°10). Pasa a Fase 1; caso
+  C-01 en `CASES.md`.
+
+**Estado: Fase 0 CERRADA.** Lista para Fase 1.
 
 ---
 

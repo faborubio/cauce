@@ -1,24 +1,183 @@
-# CASES.md — Casos de prueba y escenarios de referencia
+# CASES.md — Casos borde (backlog vivo)
 
-> Escenarios canónicos que ilustran qué hace Cauce y sirven de fixtures de validación.
-> Se llenan en Fase 2 con datos sintéticos (no personas reales).
+> Catálogo de escenarios espinosos que el motor **debe** resolver bien. Se anotan apenas
+> se detectan y se responden a medida que avanzamos; cada caso cierra con su **Respuesta**
+> y, cuando aplica, el test que lo fija. Es documentación viva: si un caso revela una
+> decisión de arquitectura, sube a un ADR del SAD.
+>
+> **Estado:** 🔲 abierto · 🟡 en análisis · ✅ resuelto
+> Datos sintéticos siempre (nunca personas reales). Toda salida lleva disclaimer (ADR-009).
 
-## Plantilla de caso
+---
+
+## A. Mortalidad y longevidad
+
+### C-01 · Proyección `q_x → q_{x,t}` con factores de mejoramiento 🔲 (Fase 1)
+- **Escenario:** las tablas 2020 traen `q_x` base + matriz `AA_{x,t}` (2021–2036, constante desde 2036). La mortalidad usada debe ser la *proyectada* al año, no la base.
+- **Por qué es borde:** usar `q_x` base subestima la longevidad (objetivo de calidad #3). La fórmula exacta vive en la **nota técnica del Anexo N°10**, no la inventamos.
+- **A decidir:** fórmula de proyección; qué año base usar; comportamiento antes de 2021 y después de 2036.
+- **Respuesta:** _pendiente — extraer fórmula del Anexo N°10 e implementar en `PuertoMortalidad`._
+
+### C-02 · Edad fuera del rango de la tabla 🔲 (Fase 1)
+- **Escenario:** `RV-2020-MUJERES` parte en edad 20; alguien con edad < 20, o cualquier persona que cruce los 110 (`q_x(110)=1`).
+- **Por qué es borde:** ¿extrapolar, truncar o lanzar error? Una extrapolación silenciosa corrompe la validez.
+- **A decidir:** política del puerto en los extremos; el MVP es vejez (edades altas), así que el borde joven puede ser error explícito.
+- **Respuesta:** _pendiente._
+
+### C-03 · Selección de tabla por (sexo, uso) 🔲 (Fase 1)
+- **Escenario:** vejez → `CB-2020-HOMBRES` (H) / `RV-2020-MUJERES` (M); sobrevivencia → `B-2020-MUJERES` / `CB-2020-HOMBRES` (misma del hombre). Invalidez (`MI`) está fuera del MVP.
+- **Por qué es borde:** asimetría regulatoria real; pedir invalidez en el MVP no debe romper ni inventar.
+- **A decidir:** mapeo explícito y qué hacer ante un uso no soportado.
+- **Respuesta:** _parcial — mapeo documentado en `data/mortalidad/README.md`; falta el guard en código._
+
+### C-04 · Horizonte forzado por `q_x(110)=1` 🔲 (Fase 1)
+- **Escenario:** toda persona muere a más tardar a los 110; las trayectorias tienen largo variable según la edad de muerte simulada.
+- **Por qué es borde:** la `TrayectoriaDeRiqueza` debe representar caminos de distinta longitud; las métricas agregan sobre muestras no alineadas.
+- **A decidir:** ¿se simula hasta la muerte de cada camino o hasta un horizonte fijo (110) con saldo "congelado" tras la muerte?
+- **Respuesta:** _pendiente._
+
+### C-05 · Sexo registral binario / dato faltante 🔲 (Fase 1)
+- **Escenario:** las tablas solo son F/M; el `Genero` del dominio es binario.
+- **Por qué es borde:** el insumo regulatorio es el sexo registral; no hay tabla para otra categoría.
+- **A decidir:** documentar que es sexo registral (selección de tabla) y exigirlo; ¿default prohibido?
+- **Respuesta:** _pendiente — decisión de producto + nota en COMPLIANCE._
+
+---
+
+## B. Des-acumulación y modalidades
+
+### C-06 · Saldo cero o casi nulo al jubilar 🔲 (Fase 2)
+- **Escenario:** persona llega a la jubilación con saldo ínfimo.
+- **Por qué es borde:** la mesada de RV → ~0; el retiro programado se agota de inmediato; divisiones por cero en el tarificador.
+- **A decidir:** mínimos, manejo numérico, y si tiene sentido comparar (o devolver "saldo insuficiente para comparar").
+- **Respuesta:** _pendiente._
+
+### C-07 · Retiro programado: recálculo anual de la mesada 🔲 (Fase 2)
+- **Escenario:** en Chile el RP **recalcula la mesada cada año** según saldo y expectativa de vida; la mesada decae con la edad.
+- **Por qué es borde:** modelarlo bien es la esencia del riesgo de longevidad del RP; simplificarlo de más invalida la comparación contra la RV.
+- **A decidir:** regla de recálculo a usar y su documentación (modelo paramétrico declarado, §11).
+- **Respuesta:** _pendiente._
+
+### C-08 · Tasa de descuento / interés técnico degenerada 🔲 (Fase 2)
+- **Escenario:** `tasa_descuento` negativa, ~0, o ≥ retorno esperado.
+- **Por qué es borde:** el valor presente de la anualidad explota o se vuelve absurdo.
+- **A decidir:** rangos válidos (referencia: tope 3% real de la norma) y validación en `Supuestos`/tarificador.
+- **Respuesta:** _pendiente._
+
+### C-09 · Renta vitalicia: VP de la anualidad = saldo (control de corrección) 🔲 (Fase 2)
+- **Escenario:** tarificar una RV cuyo valor presente actuarial debe igualar el saldo.
+- **Por qué es borde:** es el **caso de control** del objetivo de calidad #5 — verificar contra el cálculo cerrado por funciones de conmutación (`ä_x`).
+- **A decidir:** test que compara el tarificador Monte Carlo/paramétrico contra `ä_x` cerrado.
+- **Respuesta:** _pendiente — usar `ä_{x:n}=(N_x−N_{x+n})/D_x` como oráculo._
+
+### C-10 · Modalidades mixtas (RT+RV diferida, RV inm.+RP) 🔲 (Fase 2)
+- **Escenario:** el saldo se reparte entre tramos (temporal/diferido, vitalicio/programado).
+- **Por qué es borde:** empalmar tramos sin discontinuidades ni doble conteo del saldo.
+- **A decidir:** regla de partición y continuidad de la `TrayectoriaDeRiqueza` entre tramos.
+- **Respuesta:** _pendiente._
+
+### C-11 · Cola de longevidad (vivir mucho más que la EV) 🔲 (Fase 2)
+- **Escenario:** la persona supera con creces su esperanza de vida.
+- **Por qué es borde:** es **el** caso que separa las modalidades — RP agotado y sin pensión vs RV que sigue pagando. Núcleo del valor del producto.
+- **A decidir:** que la atribución de "riesgo dominante" lo capture explícitamente.
+- **Respuesta:** _pendiente._
+
+---
+
+## C. Riesgo de secuencia y retornos
+
+### C-12 · Crash de mercado en el año 1 del retiro 🔲 (Fase 2)
+- **Escenario:** secuencia de retornos adversa justo al inicio de la des-acumulación.
+- **Por qué es borde:** penaliza fuerte al RP y a la renta temporal diferida; es el riesgo de secuencia hecho carne (ADR-007).
+- **A decidir:** que el proceso de retornos lo genere y que la métrica lo muestre.
+- **Respuesta:** _pendiente._
+
+### C-13 · Volatilidad cero → determinístico (control numérico) 🔲 (Fase 1)
+- **Escenario:** `volatilidad = 0`.
+- **Por qué es borde:** el Monte Carlo debe colapsar al cálculo determinístico cerrado; **caso de control** del simulador.
+- **A decidir:** test de que con vol=0 la trayectoria coincide con la fórmula cerrada.
+- **Respuesta:** _pendiente._
+
+### C-14 · Retorno real persistentemente negativo 🔲 (Fase 2)
+- **Escenario:** inflación > retorno por períodos largos.
+- **Por qué es borde:** erosión real del saldo; no debe producir saldos negativos (el VO `SaldoPrevisional` lo prohíbe) sino agotamiento.
+- **A decidir:** manejo del piso en cero y su efecto en la prob. de agotamiento.
+- **Respuesta:** _pendiente._
+
+### C-15 · Block bootstrap vs paramétrico (mismo perfil) 🔲 (Fase 2)
+- **Escenario:** correr el mismo perfil con los dos procesos de retorno (ADR-007).
+- **Por qué es borde:** cuantifica cuánto subestima el iid/paramétrico al riesgo de secuencia.
+- **A decidir:** dejar el proceso como supuesto auditable y reportarlo.
+- **Respuesta:** _pendiente._
+
+---
+
+## D. Numéricos y determinismo
+
+### C-16 · Reproducibilidad: misma (perfil, tabla, semilla) → idéntico 🔲 (Fase 1)
+- **Escenario:** repetir la simulación con los mismos insumos.
+- **Por qué es borde:** base de auditoría (ADR-006). **Property-test** central de la Fase 1.
+- **A decidir:** fijar `BitGenerator` y versiones; acotar a "mismo entorno".
+- **Respuesta:** _pendiente._
+
+### C-17 · `n_trayectorias` extremo (1 y muy grande) 🔲 (Fase 1/2)
+- **Escenario:** una sola trayectoria (percentiles degenerados) vs 10k+ (SLA < 3 s, §10).
+- **Por qué es borde:** robustez de las métricas y cumplimiento del SLA con NumPy vectorizado.
+- **A decidir:** mínimo razonable y benchmark del SLA.
+- **Respuesta:** _pendiente._
+
+### C-18 · Frontera `Decimal` (dominio) ↔ `float64` (infra) 🔲 (Fase 1)
+- **Escenario:** el dominio usa `Decimal` (UF); el simulador NumPy usa `float64`.
+- **Por qué es borde:** redondeo al cruzar la frontera generar/evaluar (ADR-010); evitar ruido espurio o pérdida de determinismo.
+- **A decidir:** punto y regla de conversión únicos.
+- **Respuesta:** _pendiente._
+
+---
+
+## E. Contrato y arquitectura
+
+### C-19 · `TrayectoriaDeRiqueza` enchufa acumulación → des-acumulación 🔲 (Fase 4)
+- **Escenario:** una sola simulación de los 25 a la mesada, sobre el mismo contrato.
+- **Por qué es borde:** es la **prueba de fuego** de ADR-001/010 — si el contrato está bien, acumulación se enchufa sin tocar des-acumulación.
+- **A decidir:** confirmar que el saldo final de acumulación es exactamente el insumo del comparador, sin adaptadores.
+- **Respuesta:** _pendiente — se valida recién en Fase 4; anotado en el sign-off de Fase 0._
+
+### C-20 · `PerfilPrevisional` inmutable y versionado 🔲 (Fase 2)
+- **Escenario:** editar un perfil crea v2; reproducir una simulación vieja con v1 mientras existe v2.
+- **Por qué es borde:** reproducibilidad histórica (ADR-008); el motor estable + perfil versionado.
+- **A decidir:** repositorio que prohíbe sobrescribir (id, version) y recupera versiones pasadas.
+- **Respuesta:** _pendiente._
+
+---
+
+## F. Regulatorio y honestidad
+
+### C-21 · Ninguna salida sin disclaimer 🔲 (Fase 2/3)
+- **Escenario:** intentar emitir una comparación sin el disclaimer de no-asesoría.
+- **Por qué es borde:** ADR-009 gobierna todo; debe ser estructuralmente imposible omitirlo.
+- **A decidir:** test de que toda salida (REST y MCP) incluye `DISCLAIMER_NO_ASESORIA`.
+- **Respuesta:** _pendiente._
+
+### C-22 · Usuario pide recomendación vía MCP 🔲 (Fase 3)
+- **Escenario:** "¿cuál me conviene contratar?".
+- **Por qué es borde:** la capa MCP es read-only + simulación; recomendar roza asesoría regulada.
+- **A decidir:** redirigir a AFP / asesor registrado / SCOMP, mostrar escenarios, nunca elegir.
+- **Respuesta:** _pendiente._
+
+### C-23 · Sobrevivencia pedida en el MVP 🔲 (Fase 2)
+- **Escenario:** perfil con beneficiarios esperando pensión de sobrevivencia.
+- **Por qué es borde:** fuera del MVP (ADR-011); no debe inventar mortalidad conjunta a medias.
+- **A decidir:** declarar la limitación en la salida, no simularla.
+- **Respuesta:** _pendiente._
+
+---
+
+## Plantilla para casos nuevos
 
 ```
-### Caso: <nombre>
-- Perfil: edad, saldo (UF), género, supuestos (retorno/volatilidad/inflación/tasa)
-- Tabla de mortalidad: <id_version>
-- Semilla: <int>
-- Modalidades comparadas: [...]
-- Resultado esperado (cualitativo): qué riesgo domina cada modalidad
+### C-NN · <título> 🔲 (Fase X)
+- **Escenario:** ...
+- **Por qué es borde:** ...
+- **A decidir:** ...
+- **Respuesta:** _pendiente._
 ```
-
-## Casos planificados (Fase 2)
-
-1. **Saldo bajo, larga longevidad** → el retiro programado expone riesgo de agotamiento;
-   la renta vitalicia lo neutraliza a costa de herencia.
-2. **Secuencia de retornos adversa al inicio** → penaliza al retiro programado y a la
-   renta temporal diferida (ADR-007).
-3. **Comparación por género** → distinta tabla (`RV-M-2020` vs `CB-H-2020`) cambia la
-   mesada vitalicia.
