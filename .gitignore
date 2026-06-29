@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Entornos / herramientas
+.venv/
+.uv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.import_linter_cache/
+.coverage
+htmlcov/
+
+# Entorno local
+.env
+*.local
+
+# Datos y artefactos (fixtures grandes en la raíz de data/)
+data/*.csv
+data/*.parquet
+!data/.gitkeep
+# Las tablas reguladas en data/mortalidad/ SÍ se versionan (insumo canónico, pequeño)
+
+# Fuentes regulatorias pesadas: no van a git (el compendio pesa 64 MB).
+# La planilla de tablas (139K) sí se conserva como fuente de verdad.
+docs/*.pdf
+
+# IDE / SO
+.idea/
+.vscode/
+*.swp
+.DS_Store
