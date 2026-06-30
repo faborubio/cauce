@@ -18,8 +18,12 @@ from cauce.infrastructure.tarificacion.conmutacion import TarificadorConmutacion
 TOY = {Edad(65): 1.0, Edad(66): 0.5, Edad(67): 0.0}
 
 
-def _supuestos(tasa: str) -> Supuestos:
-    return Supuestos(Decimal("0.03"), Decimal("0.10"), Decimal("0.03"), Decimal(tasa))
+def _supuestos(tasa: str, margen: str = "0") -> Supuestos:
+    # la RV se tarifica con tasa_rv y margen_rv (C-27/C-28)
+    return Supuestos(
+        Decimal("0.03"), Decimal("0.10"), Decimal("0.03"), Decimal("0.03"),
+        tasa_rv=Decimal(tasa), margen_rv=Decimal(margen),
+    )
 
 
 def test_c09_anualidad_cerrada_tasa_cero() -> None:

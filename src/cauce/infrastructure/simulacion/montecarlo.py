@@ -98,14 +98,16 @@ class SimuladorMonteCarlo:
         if n_trayectorias < 1:
             raise ValueError("n_trayectorias >= 1.")
         persona = perfil.persona
+        supuestos = perfil.supuestos
         x0 = persona.edad.anios
         surv = self._mortalidad.probabilidades_supervivencia(persona, perfil.tabla_mortalidad)
-        tasa = float(perfil.supuestos.tasa_descuento)
-        factores = self._tarificador.factores_por_edad(surv, tasa)
+        # RP usa la tasa de interés técnica; la RV su propia tasa (C-28).
+        factores_rp = self._tarificador.factores_por_edad(surv, float(supuestos.tasa_descuento))
+        a_x0_rv = self._tarificador.factor_anualidad(surv, float(supuestos.tasa_rv))
 
         edades_muerte, probs, _ = self._distribucion_muerte(perfil)
         horizonte = min(EDAD_MAXIMA, int(edades_muerte[-1])) - x0
-        f_arr = np.array([factores[x0 + k] for k in range(horizonte + 1)], dtype=np.float64)
+        f_arr = np.array([factores_rp[x0 + k] for k in range(horizonte + 1)], dtype=np.float64)
 
         # Sorteo común a todas las modalidades (C-24).
         hijos = np.random.SeedSequence(perfil.semilla).spawn(2)
@@ -123,7 +125,8 @@ class SimuladorMonteCarlo:
             if modalidad is Modalidad.RETIRO_PROGRAMADO:
                 salida[modalidad] = self._evaluar_rp(saldo0, f_arr, retornos, anios_muerte)
             elif modalidad is Modalidad.RV_INMEDIATA:
-                salida[modalidad] = self._evaluar_rv(saldo0, f_arr[0], n_trayectorias)
+                saldo_efectivo = saldo0 * (1.0 - float(supuestos.margen_rv))
+                salida[modalidad] = self._evaluar_rv(saldo_efectivo, a_x0_rv, n_trayectorias)
             else:
                 raise NotImplementedError(
                     f"{modalidad.name} (mixta) llega en un incremento posterior (C-10/C-29)."
@@ -132,10 +135,13 @@ class SimuladorMonteCarlo:
 
     @staticmethod
     def _evaluar_rv(
-        saldo0: float, a_x0: float, n: int
+        saldo_efectivo: float, a_x0: float, n: int
     ) -> tuple[ResultadoTrayectoria, ...]:
-        """Renta vitalicia: mesada fija de por vida, sin herencia, sin riesgo de longevidad."""
-        mesada = _mesada(saldo0 / a_x0)
+        """Renta vitalicia: mesada fija de por vida, sin herencia, sin riesgo de longevidad.
+
+        ``saldo_efectivo`` ya viene neto del margen comercial de la compañía (C-27).
+        """
+        mesada = _mesada(saldo_efectivo / a_x0)
         cero = _saldo(0.0)
         r = ResultadoTrayectoria(mesada_inicial=mesada, mesada_final=mesada, herencia=cero)
         return tuple(r for _ in range(n))

@@ -48,7 +48,11 @@
 - **Caso de uso + REST:** `CompararModalidades` (application, solo puertos) + `interfaces/rest`
   (FastAPI, composition root). `POST /comparar` devuelve la comparación + disclaimer (C-21),
   probado con servidor real. Repo de simulaciones en memoria (Postgres = deuda §11).
-- Abierto: margen RV (C-27), tasa distinta por modalidad (C-28), modalidades mixtas (C-10/C-29).
+- **Cierre de bordes (decisiones del usuario):** se implementó fidelidad RV — `margen_rv`
+  (C-27, 0=valor justo) y `tasa_rv` distinta de la técnica del RP (C-28); RP y RV ya no parten
+  iguales. Cerrados además C-06/C-08/C-11/C-14/C-17/C-18. **Diferidas** (declarado): mixtas
+  (C-10/C-29) y bootstrap/crash (C-15/C-12). Declaradas en COMPLIANCE: C-05, C-31, C-30, C-23, C-20.
+- **Fase 2 CERRADA.** 47 tests. MVP = comparar RP vs RV por HTTP con disclaimer.
 
 ## Decisiones del SAD revisadas en esta sesión (review "vista de halcón")
 

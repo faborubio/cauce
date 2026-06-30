@@ -41,3 +41,15 @@ def test_supuestos_validan_volatilidad() -> None:
 
 def test_genero_existe() -> None:
     assert {g.value for g in Genero} == {"F", "M"}
+
+
+def test_c08_tasas_y_margen_degenerados() -> None:
+    base = {
+        "retorno_esperado": Decimal("0.04"),
+        "volatilidad": Decimal("0.10"),
+        "inflacion": Decimal("0.03"),
+    }
+    with pytest.raises(ValueError):  # tasa <= -100%
+        Supuestos(**base, tasa_descuento=Decimal("-1.5"))
+    with pytest.raises(ValueError):  # margen fuera de [0, 1)
+        Supuestos(**base, tasa_descuento=Decimal("0.03"), margen_rv=Decimal("1.2"))

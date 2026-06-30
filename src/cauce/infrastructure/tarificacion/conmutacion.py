@@ -77,8 +77,13 @@ class TarificadorConmutacion:
         supuestos: Supuestos,
         supervivencia: Mapping[Edad, float],
     ) -> Mesada:
-        """Mesada **mensual** vitalicia tal que el VP actuarial iguala el saldo (C-09)."""
-        a = self.factor_anualidad(supervivencia, float(supuestos.tasa_descuento))
-        mesada_anual = saldo.uf / Decimal(str(a))
+        """Mesada **mensual** vitalicia a la tasa de RV, neta del margen comercial (C-09/C-27/C-28).
+
+        Con ``margen_rv`` la compañía retiene una fracción del saldo: la mesada se calcula
+        sobre ``saldo * (1 - margen_rv)``. Con margen 0 es el valor actuarial justo.
+        """
+        a = self.factor_anualidad(supervivencia, float(supuestos.tasa_rv))
+        saldo_efectivo = saldo.uf * (Decimal(1) - supuestos.margen_rv)
+        mesada_anual = saldo_efectivo / Decimal(str(a))
         mensual = (mesada_anual / MESES_ANIO).quantize(Decimal("0.000001"))
         return Mesada(mensual)

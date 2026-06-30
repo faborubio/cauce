@@ -78,7 +78,7 @@ longevidad y veo la probabilidad de que agote su saldo antes de morir."
 
 **Estado: Fase 1 CERRADA.** Lista para Fase 2 (MVP des-acumulación).
 
-## Fase 2 — MVP Des-acumulación *(en curso)*
+## Fase 2 — MVP Des-acumulación
 
 **Entregable:** comparador de las modalidades del SCOMP; tarificador paramétrico; riesgo de
 secuencia; atribución de riesgo; REST mínima con disclaimers.
@@ -100,9 +100,19 @@ secuencia; atribución de riesgo; REST mínima con disclaimers.
 - [x] **REST mínima** (`interfaces/rest`, FastAPI): `POST /comparar` devuelve métricas por
   modalidad + disclaimer. Probada con `TestClient` y con servidor real (uvicorn + curl).
 - [x] Repositorio de simulaciones en memoria (Postgres = deuda declarada §11).
-- [x] 16 tests nuevos en Fase 2 (40 en total); verde (ruff, mypy 45 archivos, import-linter 3/3).
-- [ ] Modalidades mixtas RT+RV diferida / RV+RP (C-10, C-29).
-- [ ] Bordes: saldo cero (C-06), tasa degenerada (C-08); decisiones abiertas C-27/C-28.
+- [x] **Fidelidad RV:** margen comercial parametrizable (C-27) + tasa propia de RV distinta
+  de la técnica del RP (C-28). Ya no parten con la misma mesada.
+- [x] **Bordes cerrados:** saldo ínfimo (C-06), tasa/margen degenerados (C-08), cola de
+  longevidad (C-11), retornos reales negativos sin saldo negativo (C-14), `n=1` (C-17),
+  frontera `Decimal`/`float` (C-18).
+- [x] **Decisiones declaradas** (COMPLIANCE): sexo registral (C-05), PGU fuera del MVP (C-31),
+  sin recomendación (C-30), sobrevivencia ignorada (C-23), perfil inmutable/versionado (C-20).
+- [x] 23 tests nuevos en Fase 2 (47 en total); verde (ruff, mypy 45 archivos, import-linter 3/3).
+- [~] **Diferido post-MVP (declarado):** modalidades mixtas (C-10/C-29), block bootstrap y
+  crash dirigido (C-15/C-12) — enriquecimientos, no bloquean el MVP.
+
+**Estado: Fase 2 CERRADA** (MVP des-acumulación: comparar RP vs RV por HTTP, con números
+actuariales validados y disclaimer). Lista para Fase 3 (capa MCP).
 
 ### Vista de halcón (parcial)
 

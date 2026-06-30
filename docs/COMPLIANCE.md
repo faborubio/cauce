@@ -19,11 +19,19 @@ regulados (SCOMP, asesores previsionales registrados, AFP).
 | Salidas siempre con supuestos + métricas de riesgo | `application/` casos de uso (Fase 2) |
 | Acumulación: no permite "elegir" fondo obligatorio | alcance (SAD §3.3) |
 
-## Sobrevivencia (ADR-011)
+## Limitaciones declaradas del MVP (omisiones visibles, no ocultas)
 
-El MVP modela **mortalidad de una sola vida** y declara la pensión de sobrevivencia
-fuera de alcance — omisión *visible*, no oculta, para no inflar una validez actuarial que
-no se sostiene a medias.
+- **Sobrevivencia (ADR-011, C-23):** modela **una sola vida, vejez**. Acepta `beneficiarios`
+  pero no simula pensión de sobrevivencia; no infla una validez actuarial que no se sostiene a medias.
+- **Sexo registral (C-05):** la selección de tabla regulada exige sexo registral **F/M**; no
+  existe tabla para otra categoría. Sin default silencioso (se rechaza el dato faltante).
+- **Pensión mínima / PGU (C-31):** no se modela el piso estatal. El agotamiento del retiro
+  programado se muestra como **erosión real de la pensión**, sin el piso PGU; entra en fase posterior.
+- **Margen comercial de la RV (C-27):** parametrizable (`margen_rv`); con margen 0 es el
+  **valor actuarial justo** y se declara que NO replica ofertas reales de compañías.
+- **Sin recomendación (C-30, ADR-009):** la salida entrega métricas + riesgo dominante +
+  disclaimer; **nunca** un "elige esta modalidad". La dominancia se ve en los números; la
+  decisión se redirige a AFP / asesor registrado / SCOMP.
 
 ## Pendiente
 

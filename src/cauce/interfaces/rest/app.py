@@ -39,7 +39,9 @@ class PerfilRequest(BaseModel):
     retorno_esperado: Decimal = Decimal("0.03")
     volatilidad: Decimal = Decimal("0.10")
     inflacion: Decimal = Decimal("0.03")
-    tasa_descuento: Decimal = Decimal("0.03")
+    tasa_descuento: Decimal = Decimal("0.03")  # interés técnico del retiro programado
+    tasa_rv: Decimal = Decimal("0.03")  # tasa de la compañía para la RV (C-28)
+    margen_rv: Decimal = Field(default=Decimal("0"), ge=0, lt=1)  # carga comercial RV (C-27)
     semilla: int = 42
     n_trayectorias: int = Field(default=10_000, ge=1, le=200_000)
     modalidades: list[str] = Field(default=["retiro_programado", "rv_inmediata"])
@@ -71,6 +73,8 @@ def _construir_perfil(req: PerfilRequest) -> PerfilPrevisional:
             volatilidad=req.volatilidad,
             inflacion=req.inflacion,
             tasa_descuento=req.tasa_descuento,
+            tasa_rv=req.tasa_rv,
+            margen_rv=req.margen_rv,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e

@@ -51,9 +51,9 @@ docker compose up -d postgres   # base de datos local
 | Fase | Estado |
 |------|--------|
 | 0 — Scaffolding | ✅ cerrada (`a772c5d`) |
-| 1 — Núcleo de simulación | ✅ cerrada (mortalidad + retornos + simulador, 24 tests) |
-| 2 — MVP Des-acumulación | **siguiente** |
-| 3 — Capa MCP | pendiente |
+| 1 — Núcleo de simulación | ✅ cerrada (mortalidad + retornos + simulador) |
+| 2 — MVP Des-acumulación | ✅ cerrada (tarificador + comparador RP/RV + REST, 47 tests) |
+| 3 — Capa MCP | **siguiente** |
 | 4 — Acumulación | pendiente |
 
 ## Documentación viva (SAD §12)

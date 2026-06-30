@@ -28,6 +28,9 @@ def construir_perfil(
     genero: Genero = Genero.MASCULINO,
     retorno: str = "0.03",
     volatilidad: str = "0.10",
+    tasa_descuento: str = "0.03",
+    tasa_rv: str = "0.03",
+    margen_rv: str = "0",
     semilla: int = 42,
 ) -> PerfilPrevisional:
     return PerfilPrevisional(
@@ -38,7 +41,9 @@ def construir_perfil(
             retorno_esperado=Decimal(retorno),
             volatilidad=Decimal(volatilidad),
             inflacion=Decimal("0.03"),
-            tasa_descuento=Decimal("0.03"),
+            tasa_descuento=Decimal(tasa_descuento),
+            tasa_rv=Decimal(tasa_rv),
+            margen_rv=Decimal(margen_rv),
         ),
         modalidades_a_comparar=[Modalidad.RETIRO_PROGRAMADO],
         tabla_mortalidad="2020",
