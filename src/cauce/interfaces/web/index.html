@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cauce — Compara tus modalidades de pensión</title>
+  <style>
+    :root { --tinta:#1f2a37; --suave:#5b6b7d; --linea:#e3e8ee; --a:#1d6f5c; --b:#9a5b1d; --bg:#f6f7f9; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           color:var(--tinta); background:var(--bg); line-height:1.5; font-size:17px; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 18px 64px; }
+    h1 { font-size: 1.6rem; margin:.2em 0 .1em; }
+    .sub { color:var(--suave); margin:0 0 24px; }
+    .tarjeta { background:#fff; border:1px solid var(--linea); border-radius:14px; padding:20px; margin-bottom:18px; }
+    label { display:block; font-weight:600; margin:14px 0 6px; }
+    input, select { width:100%; padding:11px 12px; font-size:1rem; border:1px solid #c8d0da;
+                    border-radius:10px; background:#fff; color:var(--tinta); }
+    .toggle { display:flex; gap:8px; margin-top:6px; }
+    .toggle button { flex:1; padding:11px; font-size:1rem; border:1px solid #c8d0da; border-radius:10px;
+                     background:#fff; cursor:pointer; font-weight:600; color:var(--suave); }
+    .toggle button.on { background:var(--tinta); color:#fff; border-color:var(--tinta); }
+    .nota { color:var(--suave); font-size:.9rem; margin-top:6px; }
+    .cta { margin-top:22px; width:100%; padding:14px; font-size:1.05rem; font-weight:700; border:none;
+           border-radius:12px; background:var(--a); color:#fff; cursor:pointer; }
+    .cta:disabled { opacity:.6; cursor:default; }
+    .hidden { display:none; }
+    .grid { display:grid; gap:16px; grid-template-columns:1fr 1fr; }
+    @media (max-width:620px){ .grid{ grid-template-columns:1fr; } }
+    .modo h2 { font-size:1.15rem; margin:.1em 0 .6em; display:flex; align-items:center; gap:8px; }
+    .badge { font-size:.78rem; font-weight:700; padding:2px 9px; border-radius:999px; color:#fff; }
+    .ba { background:var(--a); } .bb { background:var(--b); }
+    .fila { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-top:1px dashed var(--linea); }
+    .fila:first-of-type { border-top:none; }
+    .fila .k { color:var(--suave); } .fila .v { font-weight:700; text-align:right; }
+    .riesgo { margin-top:12px; padding:10px 12px; background:var(--bg); border-radius:10px; font-size:.95rem; }
+    .disc { margin-top:18px; padding:16px; border-radius:12px; background:#fff7ec; border:1px solid #f0d9b5; color:#6b4a17; }
+    .err { color:#b42318; font-weight:600; margin-top:12px; }
+    .pie { color:var(--suave); font-size:.86rem; margin-top:14px; }
+    .pesos { color:var(--suave); font-weight:500; font-size:.85rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Compara tus modalidades de pensión</h1>
+    <p class="sub">Entiende la diferencia entre <strong>Retiro Programado</strong> y
+      <strong>Renta Vitalicia</strong> para llegar preparado a tu AFP.</p>
+
+    <form class="tarjeta" id="form">
+      <label for="edad">Tu edad</label>
+      <input id="edad" type="number" min="50" max="110" value="65" inputmode="numeric" />
+
+      <label for="genero">Sexo (para las tablas de mortalidad)</label>
+      <select id="genero">
+        <option value="M">Hombre</option>
+        <option value="F">Mujer</option>
+      </select>
+
+      <label>¿En qué tienes tu saldo?</label>
+      <div class="toggle" id="modo">
+        <button type="button" data-modo="uf" class="on">En UF</button>
+        <button type="button" data-modo="clp">En pesos ($)</button>
+      </div>
+
+      <label for="saldo" id="lblSaldo">Saldo en tu AFP (UF)</label>
+      <input id="saldo" type="number" min="1" step="any" value="3000" inputmode="decimal" />
+
+      <div id="boxUf" class="hidden">
+        <label for="valorUf">Valor de la UF (en pesos)</label>
+        <input id="valorUf" type="number" min="1" step="any" placeholder="Ej: 39000" inputmode="decimal" />
+        <p class="nota">Míralo en tu cartola o en el valor de la UF de hoy. Lo usamos solo para convertir.</p>
+      </div>
+
+      <button class="cta" id="btn" type="submit">Comparar</button>
+      <p class="err hidden" id="err"></p>
+    </form>
+
+    <div id="resultado" class="hidden">
+      <div class="grid">
+        <div class="tarjeta modo">
+          <h2><span class="badge ba">A</span> Retiro Programado</h2>
+          <p class="sub" style="margin:0 0 8px">Sigues siendo dueño de tu plata.</p>
+          <div class="fila"><span class="k">Mesada al inicio</span><span class="v" id="a_mesada"></span></div>
+          <div class="fila"><span class="k">Cómo evoluciona</span><span class="v" id="a_erosion"></span></div>
+          <div class="fila"><span class="k">Herencia esperada</span><span class="v" id="a_herencia"></span></div>
+          <div class="riesgo" id="a_riesgo"></div>
+        </div>
+        <div class="tarjeta modo">
+          <h2><span class="badge bb">B</span> Renta Vitalicia</h2>
+          <p class="sub" style="margin:0 0 8px">Le pasas tu plata a una aseguradora.</p>
+          <div class="fila"><span class="k">Mesada al inicio</span><span class="v" id="b_mesada"></span></div>
+          <div class="fila"><span class="k">Cómo evoluciona</span><span class="v" id="b_erosion"></span></div>
+          <div class="fila"><span class="k">Herencia esperada</span><span class="v" id="b_herencia"></span></div>
+          <div class="riesgo" id="b_riesgo"></div>
+        </div>
+      </div>
+      <div class="disc" id="disclaimer"></div>
+      <p class="pie">Números calibrados a promedios de mercado regulados (Superintendencia de Pensiones / CMF).</p>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let modo = "uf";
+
+    const NOMBRE = {
+      retiro_programado: "Retiro Programado",
+      rv_inmediata: "Renta Vitalicia",
+      rt_rv_diferida: "Renta Temporal con RV Diferida",
+      rv_inm_con_rp: "RV Inmediata con Retiro Programado",
+    };
+
+    $("modo").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      modo = b.dataset.modo;
+      for (const x of $("modo").children) x.classList.toggle("on", x === b);
+      $("lblSaldo").textContent = modo === "uf" ? "Saldo en tu AFP (UF)" : "Saldo en tu AFP (pesos $)";
+      $("boxUf").classList.toggle("hidden", modo !== "clp");
+    });
+
+    function fmtUf(x) { return Number(x).toLocaleString("es-CL", { maximumFractionDigits: 2 }) + " UF"; }
+    function fmtClp(x) { return "$" + Math.round(Number(x)).toLocaleString("es-CL"); }
+
+    function montoConPesos(uf, valorUf) {
+      let s = fmtUf(uf);
+      if (valorUf > 0) s += ` <span class="pesos">(${fmtClp(uf * valorUf)}/mes)</span>`;
+      return s;
+    }
+    function herenciaConPesos(uf, valorUf) {
+      if (Number(uf) <= 0.5) return "Sin herencia";
+      let s = "~" + fmtUf(uf);
+      if (valorUf > 0) s += ` <span class="pesos">(${fmtClp(uf * valorUf)})</span>`;
+      return s;
+    }
+    function textoErosion(erosion) {
+      // erosion = mesada_final / inicial (mediana): 1.0 = fija; < 1 = se erosiona.
+      const e = Number(erosion);
+      if (e >= 0.99) return "Se mantiene fija de por vida";
+      const baja = Math.round((1 - e) * 100);
+      return `Baja ~${baja}% hacia el final`;
+    }
+
+    function pintar(prefix, m, valorUf) {
+      $(prefix + "_mesada").innerHTML = montoConPesos(m.mesada_inicial_uf, valorUf);
+      $(prefix + "_erosion").textContent = textoErosion(m.erosion_mediana);
+      $(prefix + "_herencia").innerHTML = herenciaConPesos(m.herencia_esperada_uf, valorUf);
+      $(prefix + "_riesgo").textContent = m.riesgo_dominante;
+    }
+
+    $("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("err").classList.add("hidden");
+      const edad = parseInt($("edad").value, 10);
+      const genero = $("genero").value;
+      const saldo = parseFloat($("saldo").value);
+      const valorUf = modo === "clp" ? parseFloat($("valorUf").value) : 0;
+
+      if (!(saldo > 0)) return mostrarError("Ingresa un saldo válido.");
+      if (modo === "clp" && !(valorUf > 0)) return mostrarError("Ingresa el valor de la UF para convertir tu saldo.");
+      const saldoUf = modo === "uf" ? saldo : saldo / valorUf;
+      if (!(saldoUf > 0)) return mostrarError("El saldo en UF resultó inválido.");
+
+      $("btn").disabled = true; $("btn").textContent = "Calculando…";
+      try {
+        const r = await fetch("/comparar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ edad, genero, saldo_uf: saldoUf.toFixed(4), n_trayectorias: 5000 }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || "No se pudo calcular la comparación.");
+        }
+        const data = await r.json();
+        const porMod = {};
+        for (const m of data.modalidades) porMod[m.modalidad] = m;
+        if (porMod.retiro_programado) pintar("a", porMod.retiro_programado, valorUf);
+        if (porMod.rv_inmediata) pintar("b", porMod.rv_inmediata, valorUf);
+        $("disclaimer").textContent = data.disclaimer;
+        $("resultado").classList.remove("hidden");
+        $("resultado").scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (err) {
+        mostrarError(err.message);
+      } finally {
+        $("btn").disabled = false; $("btn").textContent = "Comparar";
+      }
+    });
+
+    function mostrarError(msg) {
+      $("err").textContent = msg; $("err").classList.remove("hidden");
+    }
+  </script>
+</body>
+</html>

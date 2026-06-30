@@ -11,6 +11,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from cauce.application.comparar_modalidades import CompararModalidades
@@ -21,6 +22,10 @@ from cauce.domain.value_objects.edad import Edad
 from cauce.domain.value_objects.genero import Genero
 from cauce.domain.value_objects.saldo import SaldoPrevisional
 from cauce.domain.value_objects.supuestos import Supuestos
+from cauce.infrastructure.calibracion.tasas_reguladas import (
+    TASA_DESCUENTO_RP,
+    TASA_RV_VEJEZ,
+)
 from cauce.infrastructure.mortalidad.adaptador import AdaptadorMortalidad
 from cauce.infrastructure.persistencia.memoria import RepositorioSimulacionesMemoria
 from cauce.infrastructure.retornos.parametrico import GeneradorRetornosParametrico
@@ -28,6 +33,8 @@ from cauce.infrastructure.simulacion.montecarlo import SimuladorMonteCarlo
 from cauce.infrastructure.tarificacion.conmutacion import TarificadorConmutacion
 
 DIR_MORTALIDAD = Path(__file__).resolve().parents[4] / "data" / "mortalidad"
+# Frontend de orientación familiar, servido por la misma app (ADR-012).
+WEB_INDEX = Path(__file__).resolve().parents[1] / "web" / "index.html"
 
 
 class PerfilRequest(BaseModel):
@@ -39,8 +46,10 @@ class PerfilRequest(BaseModel):
     retorno_esperado: Decimal = Decimal("0.03")
     volatilidad: Decimal = Decimal("0.10")
     inflacion: Decimal = Decimal("0.03")
-    tasa_descuento: Decimal = Decimal("0.03")  # interés técnico del retiro programado
-    tasa_rv: Decimal = Decimal("0.03")  # tasa de la compañía para la RV (C-28)
+    # Defaults calibrados a tasas públicas reguladas SP/CMF (ADR-014); el cliente puede
+    # sobrescribirlos. Son promedios de mercado, no la oferta personal del SCOMP.
+    tasa_descuento: Decimal = TASA_DESCUENTO_RP  # TITRP (interés técnico del RP)
+    tasa_rv: Decimal = TASA_RV_VEJEZ  # tasa media RV Vejez (C-28)
     margen_rv: Decimal = Field(default=Decimal("0"), ge=0, lt=1)  # carga comercial RV (C-27)
     semilla: int = 42
     n_trayectorias: int = Field(default=10_000, ge=1, le=200_000)
@@ -103,6 +112,11 @@ def crear_app(directorio_mortalidad: Path = DIR_MORTALIDAD) -> FastAPI:
         description="Simulador educativo. NO constituye asesoría previsional.",
         version="0.1.0",
     )
+
+    @app.get("/", include_in_schema=False)
+    def index() -> FileResponse:
+        """Web de orientación familiar: cero instalación, consume /comparar (ADR-012)."""
+        return FileResponse(WEB_INDEX, media_type="text/html")
 
     @app.post("/comparar", response_model=ComparacionResponse)
     def comparar(req: PerfilRequest) -> ComparacionResponse:

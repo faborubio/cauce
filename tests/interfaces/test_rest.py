@@ -32,7 +32,18 @@ def test_c21_disclaimer_en_toda_salida(client: TestClient) -> None:
         json={"edad": 65, "saldo_uf": "3000", "genero": "F", "n_trayectorias": 300},
     )
     assert r.status_code == 200
-    assert "NO constituye asesoría" in r.json()["disclaimer"]
+    body = r.json()["disclaimer"]
+    assert "NO constituye asesoría" in body
+    # Encuadre paramétrico: deja claro que no es la oferta real (ADR-013/014).
+    assert "ilustrativos" in body and "SCOMP" in body
+
+
+def test_web_orientacion_familiar_se_sirve(client: TestClient) -> None:
+    # La web de cero instalación vive en la misma app (ADR-012).
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+    assert "Compara tus modalidades de pensión" in r.text
 
 
 def test_edad_bajo_rango_de_tabla_da_422(client: TestClient) -> None:

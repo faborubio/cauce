@@ -125,6 +125,8 @@ graph LR
 - **(Fase 2)** Diseñar/evaluar una **SendaDePlaneo** de fondo generacional según edad **y riqueza acumulada**.
 - Versionar el **PerfilPrevisional** (persona + supuestos) de forma inmutable y persistir un **snapshot** para reproducir comparaciones.
 - Exponer consulta, explicación y simulación —en modo lectura/simulación— vía MCP.
+- **(Orientación familiar)** Ofrecer una **web mínima de cero instalación** sobre la REST: una persona no técnica ingresa edad, saldo y género y recibe la comparación **traducida a lenguaje humano** (sin UF crudas ni jerga), con el disclaimer visible. Su fin es **orientar y preparar** una conversación informada con la AFP/SCOMP, no reemplazarla.
+- **(Calibración)** Anclar los supuestos de tarificación a **tasas públicas reguladas** (SP/CMF) en vez de valores arbitrarios: `tasa_rv` ← tasa de interés media de rentas vitalicias (Vejez); `tasa_descuento` ← Tasa de Interés Técnica del Retiro Programado (TITRP). Acerca la **magnitud** al promedio de mercado del período; **no** replica la oferta personal del SCOMP (ADR-014).
 
 ### 3.3 Fuera de alcance (explícito)
 
@@ -165,6 +167,7 @@ graph TD
     subgraph interfaces["interfaces/ (entrega)"]
         REST["REST — FastAPI"]
         MCPS["MCP — FastMCP"]
+        WEB["Web estática (navegador)"]
     end
     subgraph application["application/ (casos de uso)"]
         UC["CompararModalidades · ProyectarTrayectoria<br/>ExplicarComparacion · SimularEscenario<br/>EvaluarSendaDePlaneo (fase 2) · GestionarPerfil"]
@@ -183,6 +186,7 @@ graph TD
     end
     REST --> UC
     MCPS --> UC
+    WEB -.HTTP.-> REST
     UC --> SRV
     UC --> PORT
     SRV --> ENT
@@ -194,6 +198,8 @@ graph TD
 ```
 
 > **Frontera dura:** el `domain/` define **qué es una persona previsional, qué es una trayectoria de riqueza y cómo se evalúa una modalidad** como estructuras puras, **sin NumPy ni librerías actuariales en las firmas de dominio**. La distinción clave es *generar* vs. *evaluar*: la **generación** numérica de trayectorias (Monte Carlo vectorizado), la **mortalidad**, el **generador de retornos** y el **tarificador de rentas vitalicias** viven en `infrastructure/` detrás de puertos; la **evaluación** de una modalidad dada una `TrayectoriaDeRiqueza` ya simulada (métricas, atribución de riesgo, comparación) es pura y vive en `domain/`. Así el SLA de < 3 s (§10) se cumple con NumPy en infraestructura sin contaminar el dominio, y el núcleo de evaluación se testea con trayectorias sintéticas deterministas. Blindada con `import-linter`. (ADR-010)
+
+> **REST, MCP y Web son adaptadores hermanos sobre los mismos casos de uso.** REST y MCP son adaptadores en proceso (llaman directo a los casos de uso); la **Web es un cliente delgado** que no contiene lógica propia: consume la REST por HTTP y solo traduce la respuesta a lenguaje humano. Así la misma comparación —con su disclaimer en la fuente (ADR-013)— se entrega idéntica por los tres canales. (ADR-012)
 
 ### 5.2 Nivel 2 — Módulos del dominio
 
@@ -297,17 +303,19 @@ El módulo de acumulación produce una `TrayectoriaDeRiqueza` que termina en un 
 
 ```mermaid
 graph TD
-    subgraph Maquina["Máquina del desarrollador"]
+    subgraph Maquina["Máquina del desarrollador / servidor"]
         Claude["Claude Desktop (host MCP)"]
+        Navegador["Navegador (familia)"]
         subgraph App["Proceso de la app"]
             MCPLocal["Adaptador MCP (stdio)"]
-            APILocal["Adaptador REST (uvicorn)"]
+            APILocal["Adaptador REST + estáticos (uvicorn)"]
             UC["Casos de uso"]
         end
         Worker["Worker de simulación (CPU-bound, Monte Carlo)"]
         PG[("PostgreSQL (Docker)")]
     end
     Claude -->|stdio| MCPLocal
+    Navegador -->|HTTP: web + /comparar| APILocal
     MCPLocal --> UC
     APILocal --> UC
     UC --> Worker
@@ -315,7 +323,7 @@ graph TD
     Worker --> PG
 ```
 
-> MCP y REST son adaptadores hermanos sobre los mismos casos de uso, en proceso. El Monte Carlo se delega a un worker. El cómputo es ligero (miles de trayectorias sobre un perfil); un solo nodo soporta el MVP.
+> MCP, REST y la Web son adaptadores hermanos sobre los mismos casos de uso. **La misma app FastAPI sirve la REST y los archivos estáticos de la web** (un solo proceso, sin build ni framework de frontend). Para la familia, el acceso es **cero instalación**: abren una URL en el navegador. El Monte Carlo se delega a un worker; el cómputo es ligero (miles de trayectorias sobre un perfil) y un solo nodo soporta el MVP.
 
 ---
 
@@ -352,6 +360,12 @@ graph TD
 
 **ADR-011 — Pensión de sobrevivencia fuera del MVP; el `PuertoMortalidad` admite estado-de-hogar.** *Contexto:* modelar sobrevivencia (cónyuge/hijos) convierte la mortalidad de una vida en mortalidad conjunta multi-estado, suma reglas legales de la SP (porcentajes de viudez/orfandad, condición de hijo) y otra familia de tablas (beneficiarios) — esfuerzo comparable al resto del comparador y fuente del riesgo "tarificación simplificada de más". *Decisión:* el MVP modela **mortalidad de una sola vida** y declara la sobrevivencia fuera de alcance (§3.3), pero la **firma del `PuertoMortalidad` se diseña para admitir estado-de-hogar** sin reescritura del contrato. *Consecuencia:* MVP honesto y acotado; la fase 4 agrega sobrevivencia enchufando una implementación del puerto, sin tocar el dominio ni el `TrayectoriaDeRiqueza`.
 
+**ADR-012 — Web mínima de cero instalación como adaptador hermano, cliente delgado de la REST.** *Contexto:* el destinatario real (familia, personas no técnicas) no instalará Claude Desktop ni configurará un servidor MCP; necesita orientarse y llegar preparado a la AFP. El MCP exige fricción de instalación; la REST ya expone el motor. *Decisión:* un **frontend estático** (HTML + JS mínimo, sin framework ni build) **servido por la misma app FastAPI**, que consume `POST /comparar` por HTTP y **traduce la respuesta a lenguaje humano** (RP/RV, "baja ~X% con los años", herencia, riesgo dominante; sin UF crudas — admite saldo en pesos con conversión UF). No contiene lógica de negocio: la frontera dura del ADR-010 se mantiene. *Consecuencia:* acceso cero-instalación para la familia; tercer canal sin reescribir el núcleo; el MCP (Fase 3) queda como capa conversacional posterior. Coherente con "REST y MCP son adaptadores hermanos" (§5.1).
+
+**ADR-013 — El disclaimer de no-asesoría vive en la fuente (dominio/rastro), no en cada adaptador.** *Contexto:* con tres canales (REST, MCP, Web) y uso por personas reales que toman decisiones, un disclaimer copiado en cada adaptador se desincroniza y abre huecos de cumplimiento. *Decisión:* el texto del disclaimer —incluyendo el **encuadre paramétrico** ("números ilustrativos para entender el trade-off; no son la oferta real de tu AFP/aseguradora; la cifra exacta la entrega tu AFP o el SCOMP")— se define en el **dominio (`RastroSimulacion`)** y **todos los adaptadores lo heredan** de la salida del caso de uso. *Consecuencia:* un solo lugar de verdad para el encuadre de no-asesoría (ADR-009); REST, MCP y Web emiten exactamente el mismo texto; registrado en `docs/COMPLIANCE.md`.
+
+**ADR-014 — Calibración de supuestos con tasas públicas reguladas (SP/CMF); sigue sin replicar el SCOMP.** *Contexto:* la tarificación paramétrica (ADR-003, §11) usaba supuestos de tasa arbitrarios. Existen dos series **públicas y reguladas** que mapean 1:1 a los levers del motor, sin acceso al SCOMP por persona. *Decisión:* `tasa_rv` se calibra con la **Tasa de Interés Media de las Rentas Vitalicias** (columna Vejez, mensual, publicada por la SP con fuente CMF — `spensiones.cl/apps/tasas/tasasRentasVitalicias.php`); `tasa_descuento` con la **Tasa de Interés Técnica del Retiro Programado (TITRP)** (valor único, actualización cuatrimestral; 3,31% desde enero 2026 — `spensiones.cl/apps/tasas/tasdescto.php`). Ambas son **un solo número**: se fijan como defaults citados en el código y se actualizan manualmente (TITRP ~3×/año, RV mensual). *Consecuencia:* la **magnitud** de la mesada queda anclada al promedio de mercado del período en vez de a un supuesto arbitrario; **no** son ofertas personales —siguen siendo promedios de mercado— por lo que el disclaimer (ADR-013) y la redirección al SCOMP se mantienen sin cambios.
+
 ---
 
 ## 10. Requisitos de calidad
@@ -375,12 +389,14 @@ graph TD
 | Supuestos de retorno presentados como pronóstico | Alto | Escenarios explícitos, nunca "predicción"; sensibilidad obligatoria |
 | Scope creep (querer hacer las dos mitades a la vez) | Alto | Núcleo compartido + fases; MVP des-acumulación cierra solo (ADR-001/002) |
 | Acoplar los módulos por un contrato débil | Medio | `TrayectoriaDeRiqueza` como contrato estable y testeado |
-| Tarificación SCOMP simplificada de más | Medio | Modelo paramétrico documentado; declarar que no replica ofertas reales |
+| Tarificación SCOMP simplificada de más | Medio | Modelo paramétrico documentado; **calibrado con tasas públicas reguladas SP/CMF** (ADR-014); declarar en cada salida que son promedios de mercado, no la oferta personal del SCOMP |
+| Web confunda a un usuario no técnico (toma el número como exacto) | Medio (uso real) | Disclaimer en la fuente con encuadre paramétrico (ADR-013) visible, no en letra chica; redirección explícita a AFP/SCOMP; lenguaje "para entender el trade-off, no para saber cuánto recibirás" |
+| Tasas calibradas desactualizadas (cambian en el tiempo) | Bajo | Defaults citados con fecha de fuente; TITRP cambia ~3×/año y RV es mensual — actualización manual trivial al ser un solo número (ADR-014) |
 | Anexo de tablas reguladas no descargable (rompe presupuesto USD 0) | Medio | Verificar disponibilidad pública antes de Fase 1; fallback a tabla sintética calibrada, declarado (ADR-003) |
 | Proceso de retornos iid subestima el riesgo de secuencia | Medio | Block bootstrap por defecto + paramétrico como baseline; proceso auditable (ADR-007) |
 | `cvxpy`/solver no bit-determinista entre versiones (fase 2) | Bajo | Reproducibilidad acotada al mismo entorno; solver y versión fijados; property-test de Fase 1 no cubre la senda optimizada (ADR-006) |
 
-**Deuda aceptada en el MVP:** sin nube, sin auth MCP (local), sin conexión al SCOMP real, módulo de acumulación diferido a fase 4, tarificación paramétrica (no ofertas reales de CSV), **sin pensión de sobrevivencia (mortalidad de una vida, ADR-011)**. Documentado como fase posterior.
+**Deuda aceptada en el MVP:** sin nube, sin auth MCP (local), sin conexión al SCOMP real, módulo de acumulación diferido a fase 4, **tarificación paramétrica calibrada a promedios de mercado regulados pero no a ofertas personales del SCOMP** (ADR-014), **sin pensión de sobrevivencia (mortalidad de una vida, ADR-011)**. Documentado como fase posterior.
 
 ---
 
@@ -401,11 +417,12 @@ Cada fase termina con auditoría en `AUDIT.md` y sign-off.
 | **0 — Scaffolding** | Capas, docs (§12), esqueleto de dominio, Docker + Postgres (reusa molde de Veredicto) | Repo navegable, fronteras blindadas |
 | **1 — Núcleo de simulación** | NucleoDeSimulacion Monte Carlo + `TrayectoriaDeRiqueza` + tablas de mortalidad detrás de puerto; property-test de reproducibilidad | "Simulo la trayectoria de saldo de una persona con riesgo de longevidad" |
 | **2 — MVP Des-acumulación** | Comparador de las 4 modalidades del SCOMP; tarificador paramétrico; riesgo de secuencia de retornos; atribución de riesgo; REST mínima; disclaimers | "Comparo retiro programado vs renta vitalicia para una persona y muestro qué riesgo asume en cada caso" |
+| **2.5 — Orientación familiar** | **(a)** Web mínima de cero instalación sobre la REST, traducida a lenguaje humano, saldo en pesos/UF (ADR-012); **(b)** disclaimer reforzado **en la fuente** —dominio/rastro— con encuadre paramétrico, heredado por REST/MCP/Web (ADR-013); **(c)** calibración de `tasa_rv` y `tasa_descuento` con tasas públicas SP/CMF (ADR-014) | "Mi familia abre un link, ve su comparación en lenguaje claro y llega a la AFP con preguntas concretas" |
 | **3 — Capa MCP** | Servidor MCP (stdio) read-only + simulación; Claude Desktop como host; disclaimer en cada salida | "Le pregunto a Claude qué pasa con mi pensión si vivo 5 años más" |
 | **4 — Módulo Acumulación** | SendaDePlaneo / fondo generacional según edad **y riqueza**; continuidad acumulación→des-acumulación sobre el mismo núcleo | "Una sola simulación de los 25 a la mesada: diseño el glide path y veo la pensión que produce" |
 | **5 — Opcional** | Dashboard (trayectorias/percentiles), límite de riesgo vía CVaR, benchmark de fondos generacionales, MCP remoto + OAuth | Análisis de política / soporte a asesor sin reescribir |
 
-> **Recomendación de alcance:** fases 1–3 son el MVP de portafolio (des-acumulación completa con MCP). La fase 4 es el momento "wow" (ciclo de vida completo) pero el proyecto **ya está completo y demostrable sin ella**. Profundo y angosto antes que ancho e inconcluso.
+> **Recomendación de alcance:** fases 1–3 son el MVP de portafolio (des-acumulación completa con MCP). La **Fase 2.5 se prioriza antes que la 3** porque atiende el uso real que motiva el proyecto —que la familia se oriente sin instalar nada y llegue informada a la AFP— con bajo esfuerzo (reusa la REST y el motor). El MCP (Fase 3) aporta la capa conversacional y de portafolio sobre la misma base. La fase 4 es el momento "wow" (ciclo de vida completo) pero el proyecto **ya está completo y demostrable sin ella**. Profundo y angosto antes que ancho e inconcluso.
 
 ---
 

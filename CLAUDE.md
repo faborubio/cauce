@@ -63,27 +63,36 @@ curl -s -X POST http://127.0.0.1:8077/comparar \
 | 0 — Scaffolding | ✅ cerrada (`a772c5d`) |
 | 1 — Núcleo de simulación | ✅ cerrada (mortalidad + retornos + simulador) |
 | 2 — MVP Des-acumulación | ✅ cerrada (tarificador + comparador RP/RV + REST, 47 tests) |
-| 3 — Capa MCP | **siguiente** |
+| 2.5 — Orientación familiar | **siguiente** (web cero-instalación + disclaimer en la fuente + calibración SP/CMF) |
+| 3 — Capa MCP | pendiente |
 | 4 — Acumulación | pendiente |
 
-## Retomar aquí — próximo: Fase 3 (capa MCP)
+## Retomar aquí — próximo: Fase 2.5 (orientación familiar)
 
 **Dónde estamos:** el MVP de des-acumulación funciona end-to-end (comparar RP vs RV por
 HTTP, con mortalidad regulada validada contra la fuente y disclaimer). Último commit de
-fase: Fase 2 cerrada. Backlog: 21 ✅ · 5 🟡 (declarados/diferidos) · 5 🔲 (Fase 3/4).
+fase: Fase 2 cerrada.
 
-**Plan de Fase 3** (servidor MCP read-only sobre el mismo caso de uso — REST y MCP son
-adaptadores hermanos):
+**Por qué 2.5 antes que el MCP:** el uso real que motiva el proyecto es que la familia se
+oriente sin instalar nada y llegue informada a la AFP. Eso lo sirve mejor una web sobre la
+REST (cero instalación) que el MCP (requiere Claude Desktop). El MCP queda como capa
+conversacional posterior. Ver SAD §13 (Fase 2.5) y ADR-012/013/014.
 
-1. `interfaces/mcp/` con **FastMCP** (stdio local), como composition root análogo a la REST.
-2. Herramientas (envuelven casos de uso existentes, SAD §5.3): `comparar_modalidades`,
-   `explicar_comparacion`, `metricas_pension`, `simular_escenario`.
-3. **Caso borde C-22** (clave de la fase): ante "¿cuál me conviene?", muestra números y
-   **redirige** a AFP/asesor/SCOMP — nunca recomienda. Disclaimer en cada salida (C-21).
-4. Claude Desktop como host; demo: preguntar en lenguaje natural y obtener la comparación.
+**Plan de Fase 2.5** (reusa la REST y el motor; no toca dominio salvo el disclaimer):
+
+1. **Disclaimer en la fuente (ADR-013):** mover/reforzar el texto en el dominio
+   (`RastroSimulacion`) con el encuadre paramétrico ("números ilustrativos, no la oferta
+   real; la cifra exacta la da tu AFP/SCOMP"); REST/MCP/Web lo heredan. Registrar en
+   `docs/COMPLIANCE.md`.
+2. **Calibración (ADR-014):** fijar defaults citados — `tasa_rv` ← RV media Vejez (SP/CMF,
+   `tasasRentasVitalicias.php`, mensual); `tasa_descuento` ← TITRP 3,31% ene-2026
+   (`tasdescto.php`, cuatrimestral). Ambas son un solo número.
+3. **Web mínima (ADR-012):** frontend estático servido por la misma app FastAPI; consume
+   `POST /comparar`; traduce a lenguaje humano; saldo en pesos/UF. Ver `docs/EJEMPLO_MCP.md`
+   para el tono de la traducción.
 
 **Atajos:** el motor ya está (`application/comparar_modalidades.py::CompararModalidades`);
-el MCP solo lo expone. Ver `docs/AUDIT.md` (sign-offs) y `docs/CASES.md` (casos abiertos).
+la web solo lo consume vía REST. Ver `docs/AUDIT.md` (sign-offs) y `docs/CASES.md` (casos).
 
 ## Documentación viva (SAD §12)
 

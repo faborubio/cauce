@@ -12,12 +12,16 @@ from dataclasses import dataclass
 
 from cauce.domain.entities.modalidad import Modalidad
 
-# Disclaimer de no-asesoría — obligatorio en cada salida (ADR-009, §8).
+# Disclaimer de no-asesoría — obligatorio en cada salida (ADR-009/013, §8).
+# Vive en el dominio para que TODOS los adaptadores (REST, MCP, Web) lo hereden idéntico.
+# Incluye el encuadre paramétrico: los montos son ilustrativos, no la oferta real (ADR-014).
 DISCLAIMER_NO_ASESORIA = (
     "Simulador educativo/ilustrativo. NO constituye asesoría previsional ni "
-    "recomendación personalizada. La elección de modalidad es irrevocable y materia "
-    "de procesos regulados: consulte a su AFP, a un asesor previsional registrado y al "
-    "SCOMP antes de decidir."
+    "recomendación personalizada. Los montos son ilustrativos: se calculan con supuestos "
+    "calibrados a promedios de mercado regulados, no son la oferta real de su AFP o "
+    "compañía de seguros. La cifra exacta depende de las ofertas del SCOMP para su caso. "
+    "La elección de modalidad es irrevocable y materia de procesos regulados: consulte a "
+    "su AFP, a un asesor previsional registrado y al SCOMP antes de decidir."
 )
 
 
