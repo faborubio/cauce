@@ -45,6 +45,9 @@
 - Números aleatorios comunes entre modalidades (C-24) para comparación justa.
 - Renombre: `MetricasModalidad` ahora es el de la comparación; el de trayectorias-saldo de
   Fase 1 pasó a `MetricasTrayectorias`.
+- **Caso de uso + REST:** `CompararModalidades` (application, solo puertos) + `interfaces/rest`
+  (FastAPI, composition root). `POST /comparar` devuelve la comparación + disclaimer (C-21),
+  probado con servidor real. Repo de simulaciones en memoria (Postgres = deuda §11).
 - Abierto: margen RV (C-27), tasa distinta por modalidad (C-28), modalidades mixtas (C-10/C-29).
 
 ## Decisiones del SAD revisadas en esta sesión (review "vista de halcón")

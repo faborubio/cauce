@@ -94,10 +94,15 @@ secuencia; atribución de riesgo; REST mínima con disclaimers.
   bajo cada modalidad.
 - [x] **Métricas + atribución de riesgo dominante** derivada de las métricas (**C-25**,
   **C-26**): herencia esperada/p50, erosión de la pensión, riesgo dominante.
-- [x] 10 tests nuevos (34 en total); verde (ruff, mypy 42 archivos, import-linter 3/3).
-- [ ] Caso de uso `CompararModalidades` (application) + disclaimer en salida (C-21).
-- [ ] REST mínima (`interfaces/rest`).
+- [x] **Caso de uso `CompararModalidades`** (application): orquesta puertos, arma y persiste
+  el `RastroSimulacion` con disclaimer (C-21). import-linter confirma que application no toca
+  infraestructura ni NumPy.
+- [x] **REST mínima** (`interfaces/rest`, FastAPI): `POST /comparar` devuelve métricas por
+  modalidad + disclaimer. Probada con `TestClient` y con servidor real (uvicorn + curl).
+- [x] Repositorio de simulaciones en memoria (Postgres = deuda declarada §11).
+- [x] 16 tests nuevos en Fase 2 (40 en total); verde (ruff, mypy 45 archivos, import-linter 3/3).
 - [ ] Modalidades mixtas RT+RV diferida / RV+RP (C-10, C-29).
+- [ ] Bordes: saldo cero (C-06), tasa degenerada (C-08); decisiones abiertas C-27/C-28.
 
 ### Vista de halcón (parcial)
 

@@ -142,11 +142,10 @@
 
 ## F. Regulatorio y honestidad
 
-### C-21 · Ninguna salida sin disclaimer 🔲 (Fase 2/3)
+### C-21 · Ninguna salida sin disclaimer ✅ (Fase 2)
 - **Escenario:** intentar emitir una comparación sin el disclaimer de no-asesoría.
 - **Por qué es borde:** ADR-009 gobierna todo; debe ser estructuralmente imposible omitirlo.
-- **A decidir:** test de que toda salida (REST y MCP) incluye `DISCLAIMER_NO_ASESORIA`.
-- **Respuesta:** _pendiente._
+- **Respuesta:** ✅ El caso de uso siempre arma un `RastroSimulacion`, que lleva el `DISCLAIMER_NO_ASESORIA` por defecto; la REST lo incluye en cada respuesta. Tests: `test_comparar_modalidades.py::test_c21_...`, `test_rest.py::test_c21_...`. Falta replicar en MCP (Fase 3).
 
 ### C-22 · Usuario pide recomendación vía MCP 🔲 (Fase 3)
 - **Escenario:** "¿cuál me conviene contratar?".

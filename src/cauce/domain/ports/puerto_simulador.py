@@ -8,11 +8,12 @@ para un perfil y una modalidad); la implementación vive en
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Protocol
 
 from cauce.domain.entities.modalidad import Modalidad
 from cauce.domain.entities.perfil_previsional import PerfilPrevisional
+from cauce.domain.entities.resultado_trayectoria import ResultadoTrayectoria
 from cauce.domain.entities.trayectoria_riqueza import TrayectoriaDeRiqueza
 
 
@@ -26,4 +27,13 @@ class PuertoSimulador(Protocol):
         n_trayectorias: int,
     ) -> Sequence[TrayectoriaDeRiqueza]:
         """Devuelve ``n_trayectorias`` caminos realizados de (saldo, edad)."""
+        ...
+
+    def comparar_modalidades(
+        self,
+        perfil: PerfilPrevisional,
+        modalidades: Sequence[Modalidad],
+        n_trayectorias: int,
+    ) -> Mapping[Modalidad, Sequence[ResultadoTrayectoria]]:
+        """Evalúa las modalidades sobre el mismo sorteo (números comunes, C-24)."""
         ...
