@@ -12,29 +12,25 @@
 
 ## A. Mortalidad y longevidad
 
-### C-01 · Proyección `q_x → q_{x,t}` con factores de mejoramiento 🔲 (Fase 1)
+### C-01 · Proyección `q_x → q_{x,t}` con factores de mejoramiento ✅ (Fase 1)
 - **Escenario:** las tablas 2020 traen `q_x` base + matriz `AA_{x,t}` (2021–2036, constante desde 2036). La mortalidad usada debe ser la *proyectada* al año, no la base.
 - **Por qué es borde:** usar `q_x` base subestima la longevidad (objetivo de calidad #3). La fórmula exacta vive en la **nota técnica del Anexo N°10**, no la inventamos.
-- **A decidir:** fórmula de proyección; qué año base usar; comportamiento antes de 2021 y después de 2036.
-- **Respuesta:** _pendiente — extraer fórmula del Anexo N°10 e implementar en `PuertoMortalidad`._
+- **Respuesta:** ✅ Fórmula oficial (Anexo N°10): `q_{x,año} = q_{x,2020} · ∏_{t=2021}^{año} (1 − AA_{x,t})` — **producto acumulado** (no potencia), `AA` constante desde 2036, factores por sexo. Implementada en `cargador.py::qx_proyectada` y **verificada al 9º decimal** contra el ejemplo oficial (`q_{65,2022}` = 0.008526031). Test: `test_mortalidad.py`.
 
-### C-02 · Edad fuera del rango de la tabla 🔲 (Fase 1)
+### C-02 · Edad fuera del rango de la tabla ✅ (Fase 1)
 - **Escenario:** `RV-2020-MUJERES` parte en edad 20; alguien con edad < 20, o cualquier persona que cruce los 110 (`q_x(110)=1`).
 - **Por qué es borde:** ¿extrapolar, truncar o lanzar error? Una extrapolación silenciosa corrompe la validez.
-- **A decidir:** política del puerto en los extremos; el MVP es vejez (edades altas), así que el borde joven puede ser error explícito.
-- **Respuesta:** _pendiente._
+- **Respuesta:** ✅ Borde joven → **error explícito** (`ValueError`, nunca extrapola). Borde alto → `q_x(110)=1` trunca la trayectoria a los 110 (ver C-04). Test: `test_mortalidad.py::test_c02_edad_fuera_de_rango`.
 
-### C-03 · Selección de tabla por (sexo, uso) 🔲 (Fase 1)
+### C-03 · Selección de tabla por (sexo, uso) ✅ (Fase 1)
 - **Escenario:** vejez → `CB-2020-HOMBRES` (H) / `RV-2020-MUJERES` (M); sobrevivencia → `B-2020-MUJERES` / `CB-2020-HOMBRES` (misma del hombre). Invalidez (`MI`) está fuera del MVP.
 - **Por qué es borde:** asimetría regulatoria real; pedir invalidez en el MVP no debe romper ni inventar.
-- **A decidir:** mapeo explícito y qué hacer ante un uso no soportado.
-- **Respuesta:** _parcial — mapeo documentado en `data/mortalidad/README.md`; falta el guard en código._
+- **Respuesta:** ✅ Mapeo `(uso, sexo) → tabla` explícito en `adaptador.py::_TABLAS`; uso no soportado → `ValueError`. Verificado que la mujer sobrevive más (S(90) M > H). Test: `test_mortalidad.py::test_c03_...`.
 
-### C-04 · Horizonte forzado por `q_x(110)=1` 🔲 (Fase 1)
+### C-04 · Horizonte forzado por `q_x(110)=1` ✅ (Fase 1)
 - **Escenario:** toda persona muere a más tardar a los 110; las trayectorias tienen largo variable según la edad de muerte simulada.
 - **Por qué es borde:** la `TrayectoriaDeRiqueza` debe representar caminos de distinta longitud; las métricas agregan sobre muestras no alineadas.
-- **A decidir:** ¿se simula hasta la muerte de cada camino o hasta un horizonte fijo (110) con saldo "congelado" tras la muerte?
-- **Respuesta:** _pendiente._
+- **Respuesta:** ✅ Se sortea la edad de muerte por trayectoria y cada `TrayectoriaDeRiqueza` se trunca ahí (largos 1–46 en el demo, todas terminan ≤110). Test: `test_simulador.py::test_c04_...`.
 
 ### C-05 · Sexo registral binario / dato faltante 🔲 (Fase 1)
 - **Escenario:** las tablas solo son F/M; el `Genero` del dominio es binario.
@@ -92,11 +88,10 @@
 - **A decidir:** que el proceso de retornos lo genere y que la métrica lo muestre.
 - **Respuesta:** _pendiente._
 
-### C-13 · Volatilidad cero → determinístico (control numérico) 🔲 (Fase 1)
+### C-13 · Volatilidad cero → determinístico (control numérico) ✅ (Fase 1)
 - **Escenario:** `volatilidad = 0`.
 - **Por qué es borde:** el Monte Carlo debe colapsar al cálculo determinístico cerrado; **caso de control** del simulador.
-- **A decidir:** test de que con vol=0 la trayectoria coincide con la fórmula cerrada.
-- **Respuesta:** _pendiente._
+- **Respuesta:** ✅ Con `volatilidad=0` el generador devuelve todos los retornos = media exacta (la des-acumulación queda determinística salvo la edad de muerte). Test: `test_retornos.py::test_c13_...`.
 
 ### C-14 · Retorno real persistentemente negativo 🔲 (Fase 2)
 - **Escenario:** inflación > retorno por períodos largos.
@@ -114,23 +109,20 @@
 
 ## D. Numéricos y determinismo
 
-### C-16 · Reproducibilidad: misma (perfil, tabla, semilla) → idéntico 🔲 (Fase 1)
+### C-16 · Reproducibilidad: misma (perfil, tabla, semilla) → idéntico ✅ (Fase 1)
 - **Escenario:** repetir la simulación con los mismos insumos.
 - **Por qué es borde:** base de auditoría (ADR-006). **Property-test** central de la Fase 1.
-- **A decidir:** fijar `BitGenerator` y versiones; acotar a "mismo entorno".
-- **Respuesta:** _pendiente._
+- **Respuesta:** ✅ Toda la aleatoriedad nace de `perfil.semilla` vía `np.random.SeedSequence` con corrientes independientes (mortalidad / retornos). Misma semilla → trayectorias idénticas; semilla distinta → cambian. Tests: `test_simulador.py::test_c16_...`, `test_semilla_distinta_cambia`.
 
-### C-17 · `n_trayectorias` extremo (1 y muy grande) 🔲 (Fase 1/2)
+### C-17 · `n_trayectorias` extremo (1 y muy grande) 🟡 (Fase 1/2)
 - **Escenario:** una sola trayectoria (percentiles degenerados) vs 10k+ (SLA < 3 s, §10).
 - **Por qué es borde:** robustez de las métricas y cumplimiento del SLA con NumPy vectorizado.
-- **A decidir:** mínimo razonable y benchmark del SLA.
-- **Respuesta:** _pendiente._
+- **Respuesta:** 🟡 SLA cumplido (10k + métricas en ~1.0 s). Falta blindar el extremo `n=1` (percentiles degenerados) — pendiente para Fase 2 junto al comparador.
 
-### C-18 · Frontera `Decimal` (dominio) ↔ `float64` (infra) 🔲 (Fase 1)
+### C-18 · Frontera `Decimal` (dominio) ↔ `float64` (infra) 🟡 (Fase 1)
 - **Escenario:** el dominio usa `Decimal` (UF); el simulador NumPy usa `float64`.
 - **Por qué es borde:** redondeo al cruzar la frontera generar/evaluar (ADR-010); evitar ruido espurio o pérdida de determinismo.
-- **A decidir:** punto y regla de conversión únicos.
-- **Respuesta:** _pendiente._
+- **Respuesta:** 🟡 Conversión única en `_a_trayectorias` (`Decimal(f"{saldo:.6f}")`, 6 decimales UF). Determinista. Revisar en Fase 2 si la cuantización a 6 decimales afecta percentiles finos.
 
 ---
 
