@@ -42,8 +42,18 @@ uv run ruff check .             # lint
 uv run ruff format .            # formato
 uv run mypy                     # tipos (--strict, configurado en pyproject)
 uv run lint-imports             # fronteras de capas (import-linter)
-uv run pytest                   # tests
-docker compose up -d postgres   # base de datos local
+uv run pytest                   # tests (47, verdes)
+docker compose up -d postgres   # base de datos local (deuda: persistencia real)
+```
+
+### Correr el MVP (REST)
+
+```bash
+uv run uvicorn cauce.interfaces.rest.app:app --port 8077
+curl -s -X POST http://127.0.0.1:8077/comparar \
+  -H 'Content-Type: application/json' \
+  -d '{"edad":65,"saldo_uf":"3000","genero":"M","n_trayectorias":5000}'
+# → RP vs RV con mesada, herencia, erosión, riesgo dominante + disclaimer
 ```
 
 ## Estado por fases (SAD §13)
@@ -55,6 +65,25 @@ docker compose up -d postgres   # base de datos local
 | 2 — MVP Des-acumulación | ✅ cerrada (tarificador + comparador RP/RV + REST, 47 tests) |
 | 3 — Capa MCP | **siguiente** |
 | 4 — Acumulación | pendiente |
+
+## Retomar aquí — próximo: Fase 3 (capa MCP)
+
+**Dónde estamos:** el MVP de des-acumulación funciona end-to-end (comparar RP vs RV por
+HTTP, con mortalidad regulada validada contra la fuente y disclaimer). Último commit de
+fase: Fase 2 cerrada. Backlog: 21 ✅ · 5 🟡 (declarados/diferidos) · 5 🔲 (Fase 3/4).
+
+**Plan de Fase 3** (servidor MCP read-only sobre el mismo caso de uso — REST y MCP son
+adaptadores hermanos):
+
+1. `interfaces/mcp/` con **FastMCP** (stdio local), como composition root análogo a la REST.
+2. Herramientas (envuelven casos de uso existentes, SAD §5.3): `comparar_modalidades`,
+   `explicar_comparacion`, `metricas_pension`, `simular_escenario`.
+3. **Caso borde C-22** (clave de la fase): ante "¿cuál me conviene?", muestra números y
+   **redirige** a AFP/asesor/SCOMP — nunca recomienda. Disclaimer en cada salida (C-21).
+4. Claude Desktop como host; demo: preguntar en lenguaje natural y obtener la comparación.
+
+**Atajos:** el motor ya está (`application/comparar_modalidades.py::CompararModalidades`);
+el MCP solo lo expone. Ver `docs/AUDIT.md` (sign-offs) y `docs/CASES.md` (casos abiertos).
 
 ## Documentación viva (SAD §12)
 

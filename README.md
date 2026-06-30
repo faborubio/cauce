@@ -11,9 +11,17 @@ en lenguaje natural.
 
 ## Estado
 
-**Fase 0 — Scaffolding.** Esqueleto navegable, fronteras de capas blindadas, dominio
-puro. El núcleo de simulación (Fase 1) y el comparador de modalidades (Fase 2, MVP)
-están pendientes. Ver hoja de ruta en el [SAD](./SAD_Cauce_pensiones.md) §13.
+**MVP de des-acumulación funcionando** (Fases 0–2 cerradas): comparar retiro programado
+vs renta vitalicia por HTTP, con mortalidad regulada 2020 validada contra la fuente
+(NCG/Compendio SP) y disclaimer de no-asesoría. **Fase 3 (capa MCP)** es lo siguiente.
+47 tests; `ruff` + `mypy --strict` + `import-linter` verdes. Hoja de ruta: [SAD](./SAD_Cauce_pensiones.md) §13.
+
+```bash
+uv run uvicorn cauce.interfaces.rest.app:app --port 8077
+curl -s -X POST http://127.0.0.1:8077/comparar \
+  -H 'Content-Type: application/json' \
+  -d '{"edad":65,"saldo_uf":"3000","genero":"M","n_trayectorias":5000}'
+```
 
 ## Requisitos
 
