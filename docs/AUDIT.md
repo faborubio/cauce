@@ -78,6 +78,35 @@ longevidad y veo la probabilidad de que agote su saldo antes de morir."
 
 **Estado: Fase 1 CERRADA.** Lista para Fase 2 (MVP des-acumulación).
 
-## Fase 2 — MVP Des-acumulación *(pendiente)*
+## Fase 2 — MVP Des-acumulación *(en curso)*
+
+**Entregable:** comparador de las modalidades del SCOMP; tarificador paramétrico; riesgo de
+secuencia; atribución de riesgo; REST mínima con disclaimers.
+
+### Avance
+
+- [x] **Tarificador** por funciones de conmutación (`PuertoTarificador`): `ä_x`, mesada de
+  RV. Control cerrado **C-09** verificado (cálculo a mano + propiedad VP·mesada=saldo).
+- [x] **Retiro programado con recálculo anual** `mesada_t = saldo_t/ä(edad_t)` (**C-07**),
+  reusando el tarificador. La mesada se erosiona (mediana ~0.50) y deja herencia.
+- [x] **Renta vitalicia** inmediata: mesada fija de por vida, sin herencia.
+- [x] **Comparación con números aleatorios comunes** (**C-24**): un solo sorteo evaluado
+  bajo cada modalidad.
+- [x] **Métricas + atribución de riesgo dominante** derivada de las métricas (**C-25**,
+  **C-26**): herencia esperada/p50, erosión de la pensión, riesgo dominante.
+- [x] 10 tests nuevos (34 en total); verde (ruff, mypy 42 archivos, import-linter 3/3).
+- [ ] Caso de uso `CompararModalidades` (application) + disclaimer en salida (C-21).
+- [ ] REST mínima (`interfaces/rest`).
+- [ ] Modalidades mixtas RT+RV diferida / RV+RP (C-10, C-29).
+
+### Vista de halcón (parcial)
+
+- **¿La comparación es justa?** ✅ Números comunes (C-24): RP y RV se evalúan sobre el
+  mismo sorteo, sin ruido Monte Carlo entre ellas.
+- **¿El resultado es actuarialmente honesto?** ✅ RP y RV parten con la **misma mesada**
+  (ambas `saldo/ä(x0)`); divergen por erosión vs. fijeza y por herencia. Refleja el
+  trade-off real del SCOMP.
+- **Deuda declarada abierta:** margen comercial de la RV (**C-27**) y tasa distinta por
+  modalidad (**C-28**) no modelados — hoy RP y RV usan la misma tasa técnica.
 ## Fase 3 — Capa MCP *(pendiente)*
 ## Fase 4 — Acumulación *(pendiente)*

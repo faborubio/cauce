@@ -7,12 +7,10 @@ es testeable sin infraestructura.
 
 from decimal import Decimal
 
-from cauce.domain.entities.modalidad import Modalidad
 from cauce.domain.entities.trayectoria_riqueza import (
     PuntoTrayectoria,
     TrayectoriaDeRiqueza,
 )
-from cauce.domain.services.comparador_modalidades import comparar
 from cauce.domain.services.metricas import calcular_metricas
 from cauce.domain.value_objects.edad import Edad
 from cauce.domain.value_objects.saldo import SaldoPrevisional
@@ -37,13 +35,6 @@ def test_metricas_detectan_agotamiento() -> None:
     assert m.saldo_final_p10_uf <= m.saldo_final_p90_uf
 
 
-def test_comparar_evalua_por_modalidad() -> None:
-    comp = comparar(
-        {
-            Modalidad.RETIRO_PROGRAMADO: [_trayectoria(0, agota=True), _trayectoria(300)],
-            Modalidad.RV_INMEDIATA: [_trayectoria(200), _trayectoria(200)],
-        }
-    )
-    # El retiro programado expone riesgo de longevidad (agotamiento > 0); la RV no.
-    assert comp.metricas_por_modalidad[Modalidad.RETIRO_PROGRAMADO].probabilidad_agotamiento > 0
-    assert comp.metricas_por_modalidad[Modalidad.RV_INMEDIATA].probabilidad_agotamiento == 0
+def test_percentiles_ordenados() -> None:
+    m = calcular_metricas([_trayectoria(100), _trayectoria(500), _trayectoria(900)])
+    assert m.saldo_final_p10_uf <= m.saldo_final_esperado_uf <= m.saldo_final_p90_uf

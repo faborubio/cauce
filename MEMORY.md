@@ -31,6 +31,22 @@
 - **Deuda declarada:** regla de retiro simplificada (`saldo/e_x`); recálculo anual del RP
   es C-07 (Fase 2). Tarificador y comparación de 4 modalidades, Fase 2.
 
+## 2026-06-29 — Fase 2 (en curso): comparador de modalidades
+
+- **Decisión de modelado (usuario):** el RP usa **recálculo anual realista** (C-07),
+  `mesada_t=saldo_t/ä(edad_t)`, reusando el tarificador. El riesgo de longevidad del RP es
+  **erosión de la pensión**, no cero duro.
+- Contrato compartido `TrayectoriaDeRiqueza` se mantuvo limpio: el ingreso y la herencia
+  viven en `ResultadoTrayectoria` (propio de des-acumulación), no en el contrato que Fase 4
+  reusa.
+- **Resultado clave validado:** RP y RV parten con la **misma mesada** (`saldo/ä(x0)`);
+  divergen por erosión (RP ~0.50) vs fijeza (RV 1.0) y por herencia (RP ~887 UF vs RV 0).
+  Atribución de riesgo derivada de métricas (C-25), no hardcodeada.
+- Números aleatorios comunes entre modalidades (C-24) para comparación justa.
+- Renombre: `MetricasModalidad` ahora es el de la comparación; el de trayectorias-saldo de
+  Fase 1 pasó a `MetricasTrayectorias`.
+- Abierto: margen RV (C-27), tasa distinta por modalidad (C-28), modalidades mixtas (C-10/C-29).
+
 ## Decisiones del SAD revisadas en esta sesión (review "vista de halcón")
 
 - **ADR-010** (nuevo): generación numérica en infraestructura; dominio solo evalúa.

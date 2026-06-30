@@ -17,7 +17,7 @@ from cauce.domain.entities.trayectoria_riqueza import TrayectoriaDeRiqueza
 
 
 @dataclass(frozen=True, slots=True)
-class MetricasModalidad:
+class MetricasTrayectorias:
     """Resumen de riesgo/resultado de una modalidad sobre el sample simulado."""
 
     n_trayectorias: int
@@ -40,7 +40,7 @@ def _percentil(valores_ordenados: Sequence[Decimal], fraccion: float) -> Decimal
     return valores_ordenados[bajo] + (valores_ordenados[alto] - valores_ordenados[bajo]) * peso
 
 
-def calcular_metricas(trayectorias: Sequence[TrayectoriaDeRiqueza]) -> MetricasModalidad:
+def calcular_metricas(trayectorias: Sequence[TrayectoriaDeRiqueza]) -> MetricasTrayectorias:
     """Evalúa el conjunto de trayectorias realizadas de una modalidad."""
     if not trayectorias:
         raise ValueError("Se requiere al menos una trayectoria para calcular métricas.")
@@ -49,7 +49,7 @@ def calcular_metricas(trayectorias: Sequence[TrayectoriaDeRiqueza]) -> MetricasM
     n_agotadas = sum(1 for t in trayectorias if t.se_agoto())
     saldos_finales = sorted(t.saldo_final.uf for t in trayectorias)
 
-    return MetricasModalidad(
+    return MetricasTrayectorias(
         n_trayectorias=n,
         probabilidad_agotamiento=n_agotadas / n,
         saldo_final_esperado_uf=Decimal(str(mean(saldos_finales))),

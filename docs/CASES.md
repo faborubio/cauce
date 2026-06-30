@@ -48,11 +48,10 @@
 - **A decidir:** mínimos, manejo numérico, y si tiene sentido comparar (o devolver "saldo insuficiente para comparar").
 - **Respuesta:** _pendiente._
 
-### C-07 · Retiro programado: recálculo anual de la mesada 🔲 (Fase 2)
+### C-07 · Retiro programado: recálculo anual de la mesada ✅ (Fase 2)
 - **Escenario:** en Chile el RP **recalcula la mesada cada año** según saldo y expectativa de vida; la mesada decae con la edad.
 - **Por qué es borde:** modelarlo bien es la esencia del riesgo de longevidad del RP; simplificarlo de más invalida la comparación contra la RV.
-- **A decidir:** regla de recálculo a usar y su documentación (modelo paramétrico declarado, §11).
-- **Respuesta:** _pendiente._
+- **Respuesta:** ✅ El RP recalcula `mesada_t = saldo_t / ä(edad_t)` cada año (reusa el tarificador). La mesada decae con la edad; nunca cero duro, deja herencia. En el demo erosiona a ~0.50 mediana. `montecarlo.py::_evaluar_rp`.
 
 ### C-08 · Tasa de descuento / interés técnico degenerada 🔲 (Fase 2)
 - **Escenario:** `tasa_descuento` negativa, ~0, o ≥ retorno esperado.
@@ -60,11 +59,10 @@
 - **A decidir:** rangos válidos (referencia: tope 3% real de la norma) y validación en `Supuestos`/tarificador.
 - **Respuesta:** _pendiente._
 
-### C-09 · Renta vitalicia: VP de la anualidad = saldo (control de corrección) 🔲 (Fase 2)
+### C-09 · Renta vitalicia: VP de la anualidad = saldo (control de corrección) ✅ (Fase 2)
 - **Escenario:** tarificar una RV cuyo valor presente actuarial debe igualar el saldo.
 - **Por qué es borde:** es el **caso de control** del objetivo de calidad #5 — verificar contra el cálculo cerrado por funciones de conmutación (`ä_x`).
-- **A decidir:** test que compara el tarificador Monte Carlo/paramétrico contra `ä_x` cerrado.
-- **Respuesta:** _pendiente — usar `ä_{x:n}=(N_x−N_{x+n})/D_x` como oráculo._
+- **Respuesta:** ✅ Tarificador por conmutación `ä_x=Σ v^k·S(x0+k)`; mesada=saldo/ä. Verificado contra cálculo a mano (ä juguete=1.5; VP·mesada=saldo). Tests: `test_tarificador.py`.
 
 ### C-10 · Modalidades mixtas (RT+RV diferida, RV inm.+RP) 🔲 (Fase 2)
 - **Escenario:** el saldo se reparte entre tramos (temporal/diferido, vitalicio/programado).
@@ -160,6 +158,55 @@
 - **Escenario:** perfil con beneficiarios esperando pensión de sobrevivencia.
 - **Por qué es borde:** fuera del MVP (ADR-011); no debe inventar mortalidad conjunta a medias.
 - **A decidir:** declarar la limitación en la salida, no simularla.
+- **Respuesta:** _pendiente._
+
+---
+
+## G. Tarificación y comparación (Fase 2)
+
+### C-24 · Números aleatorios comunes entre modalidades ✅ (Fase 2)
+- **Escenario:** comparar las 4 modalidades del SCOMP para un mismo perfil.
+- **Por qué es borde:** si cada modalidad usa un sorteo Monte Carlo independiente, el **ruido** del muestreo contamina la comparación y dos modalidades casi iguales pueden parecer distintas. Hay que evaluarlas sobre las **mismas trayectorias** de mortalidad y retornos (common random numbers).
+- **Respuesta:** ✅ Un solo sorteo (mortalidad + retornos) desde `perfil.semilla`, evaluado bajo cada modalidad. Misma semilla → comparación idéntica. Test: `test_comparacion.py::test_c24_...`.
+
+### C-25 · Atribución objetiva del riesgo dominante ✅ (Fase 2)
+- **Escenario:** cada salida debe decir *qué riesgo asume* el pensionado en cada modalidad (longevidad / mercado / irrevocabilidad / cero herencia).
+- **Por qué es borde:** es el corazón de la explicabilidad (objetivo #4); no puede ser una etiqueta hardcodeada, debe derivarse de las métricas (p. ej. prob. agotamiento alta ⇒ riesgo de longevidad).
+- **Respuesta:** ✅ `atribuir_riesgo` deriva el riesgo de las métricas (herencia≈0 + erosión≈1 → irrevocabilidad; erosión<0.85 → longevidad). No es etiqueta fija. Test: `test_comparacion.py::test_c25_...`.
+
+### C-26 · Herencia como métrica diferenciadora ✅ (Fase 2)
+- **Escenario:** el retiro programado deja **herencia** (saldo a la muerte); la renta vitalicia no.
+- **Por qué es borde:** es uno de los ejes que separan las modalidades; comparar solo por mesada esconde este trade-off.
+- **Respuesta:** ✅ Herencia = saldo a la muerte por trayectoria; RP>0 (~887 UF demo), RV=0. Esperada + p50. Test: `test_comparacion.py::test_c26_...`.
+
+### C-27 · Carga / margen de la compañía en la renta vitalicia 🔲 (Fase 2)
+- **Escenario:** la RV real se tarifica con un **margen** sobre el valor actuarial justo; nuestro tarificador es paramétrico.
+- **Por qué es borde:** sin margen, la RV parece más generosa que la real; con un margen inventado, parece dato real. Riesgo de "tarificación simplificada de más" (§11).
+- **A decidir:** ¿valor actuarial justo declarado, o factor de carga explícito y parametrizable? Declarar que NO replica ofertas reales.
+- **Respuesta:** _pendiente._
+
+### C-28 · Tasa de interés técnica del RP vs tasa de la RV 🔲 (Fase 2)
+- **Escenario:** el retiro programado usa una **tasa de interés técnica** regulada (vector de tasas); la RV usa la tasa de la compañía.
+- **Por qué es borde:** usar una sola tasa para ambos sesga la comparación.
+- **A decidir:** modelar la tasa por modalidad como supuesto explícito y auditable.
+- **Respuesta:** _pendiente._
+
+### C-29 · Renta temporal + RV diferida: partición y discontinuidad 🔲 (Fase 2)
+- **Escenario:** el saldo se parte entre un tramo temporal (mesada alta) y una RV diferida (mesada menor luego).
+- **Por qué es borde:** discontinuidad de la mesada al pasar de un tramo a otro; el saldo no se puede contar dos veces.
+- **A decidir:** regla de partición del saldo y empalme continuo de la `TrayectoriaDeRiqueza` (relacionado a C-10).
+- **Respuesta:** _pendiente._
+
+### C-30 · Reportar dominancia sin recomendar 🔲 (Fase 2/3)
+- **Escenario:** una modalidad resulta mejor en *todas* las métricas (más mesada y más herencia).
+- **Por qué es borde:** mostrar "esta es mejor" roza la recomendación (ADR-009); pero ocultarlo es deshonesto.
+- **A decidir:** lenguaje que expone la dominancia en métricas + sensibilidades, sin emitir un "elige esta", con disclaimer.
+- **Respuesta:** _pendiente._
+
+### C-31 · Pensión mínima / PGU como piso 🔲 (Fase 2)
+- **Escenario:** existe un piso regulado (Pensión Garantizada Universal / pensión mínima) bajo el cual no se cae.
+- **Por qué es borde:** cambia el riesgo de longevidad efectivo (el agotamiento del RP no deja a la persona en cero real).
+- **A decidir:** ¿el MVP modela el piso o lo declara fuera de alcance? Si lo declara, dejarlo visible.
 - **Respuesta:** _pendiente._
 
 ---

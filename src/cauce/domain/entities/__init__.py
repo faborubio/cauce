@@ -4,6 +4,7 @@ from cauce.domain.entities.modalidad import Modalidad
 from cauce.domain.entities.perfil_previsional import PerfilPrevisional
 from cauce.domain.entities.persona import Persona
 from cauce.domain.entities.rastro import RastroSimulacion
+from cauce.domain.entities.resultado_trayectoria import ResultadoTrayectoria
 from cauce.domain.entities.trayectoria_riqueza import PuntoTrayectoria, TrayectoriaDeRiqueza
 
 __all__ = [
@@ -12,5 +13,6 @@ __all__ = [
     "Persona",
     "PuntoTrayectoria",
     "RastroSimulacion",
+    "ResultadoTrayectoria",
     "TrayectoriaDeRiqueza",
 ]
