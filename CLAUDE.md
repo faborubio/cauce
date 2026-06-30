@@ -42,18 +42,19 @@ uv run ruff check .             # lint
 uv run ruff format .            # formato
 uv run mypy                     # tipos (--strict, configurado en pyproject)
 uv run lint-imports             # fronteras de capas (import-linter)
-uv run pytest                   # tests (47, verdes)
+uv run pytest                   # tests (53, verdes)
 docker compose up -d postgres   # base de datos local (deuda: persistencia real)
 ```
 
-### Correr el MVP (REST)
+### Correr el MVP
 
 ```bash
+# REST + Web de orientación familiar (Fase 2/2.5)
 uv run uvicorn cauce.interfaces.rest.app:app --port 8077
-curl -s -X POST http://127.0.0.1:8077/comparar \
-  -H 'Content-Type: application/json' \
-  -d '{"edad":65,"saldo_uf":"3000","genero":"M","n_trayectorias":5000}'
-# → RP vs RV con mesada, herencia, erosión, riesgo dominante + disclaimer
+#   → http://127.0.0.1:8077/ (web) · POST /comparar (RP vs RV + disclaimer)
+
+# MCP para Claude Desktop (Fase 3, stdio): comparar_modalidades + simular_escenario
+uv run python -m cauce.interfaces.mcp.server   # config en DEPLOY.md
 ```
 
 ## Estado por fases (SAD §13)
@@ -62,37 +63,31 @@ curl -s -X POST http://127.0.0.1:8077/comparar \
 |------|--------|
 | 0 — Scaffolding | ✅ cerrada (`a772c5d`) |
 | 1 — Núcleo de simulación | ✅ cerrada (mortalidad + retornos + simulador) |
-| 2 — MVP Des-acumulación | ✅ cerrada (tarificador + comparador RP/RV + REST, 47 tests) |
-| 2.5 — Orientación familiar | **siguiente** (web cero-instalación + disclaimer en la fuente + calibración SP/CMF) |
-| 3 — Capa MCP | pendiente |
-| 4 — Acumulación | pendiente |
+| 2 — MVP Des-acumulación | ✅ cerrada (tarificador + comparador RP/RV + REST) |
+| 2.5 — Orientación familiar | ✅ cerrada (web + disclaimer en la fuente + calibración SP/CMF, `053fdf1`) |
+| 3 — Capa MCP | ✅ cerrada (FastMCP stdio: comparar_modalidades + simular_escenario, 53 tests) |
+| 4 — Acumulación | **siguiente** |
 
-## Retomar aquí — próximo: Fase 2.5 (orientación familiar)
+## Retomar aquí — próximo: Fase 4 (módulo de acumulación)
 
-**Dónde estamos:** el MVP de des-acumulación funciona end-to-end (comparar RP vs RV por
-HTTP, con mortalidad regulada validada contra la fuente y disclaimer). Último commit de
-fase: Fase 2 cerrada.
+**Dónde estamos:** el MVP de des-acumulación está completo y demostrable por **tres canales
+hermanos** sobre el mismo `CompararModalidades`: REST, Web de orientación familiar (cero
+instalación) y MCP (Claude Desktop). Todo con mortalidad regulada validada, supuestos
+calibrados a tasas públicas SP/CMF, y disclaimer + guardrail C-22 en la fuente. 53 tests verdes.
 
-**Por qué 2.5 antes que el MCP:** el uso real que motiva el proyecto es que la familia se
-oriente sin instalar nada y llegue informada a la AFP. Eso lo sirve mejor una web sobre la
-REST (cero instalación) que el MCP (requiere Claude Desktop). El MCP queda como capa
-conversacional posterior. Ver SAD §13 (Fase 2.5) y ADR-012/013/014.
+**Fase 3 entregada:** `interfaces/mcp/server.py` (FastMCP stdio) expone `comparar_modalidades`
+y `simular_escenario`; el caso borde C-22 vive en las `instructions` del servidor y en el
+campo `no_recomendacion` de cada salida. `explicar_comparacion`/`metricas_pension`/`evaluar_senda`
+quedan diferidas (SAD §5.3). Config Claude Desktop en `DEPLOY.md`.
 
-**Plan de Fase 2.5** (reusa la REST y el motor; no toca dominio salvo el disclaimer):
+**Plan de Fase 4** (el momento "wow": ciclo de vida completo, SAD §13): módulo de acumulación
+que produce una `TrayectoriaDeRiqueza` terminando en el saldo a la jubilación — exactamente el
+insumo del comparador. `SendaDePlaneo`/glide path de fondo generacional según edad **y riqueza**.
+Se enchufa sobre el mismo núcleo sin tocar la des-acumulación (ADR-001). El proyecto **ya está
+completo y demostrable sin la Fase 4**; es profundización, no requisito.
 
-1. **Disclaimer en la fuente (ADR-013):** mover/reforzar el texto en el dominio
-   (`RastroSimulacion`) con el encuadre paramétrico ("números ilustrativos, no la oferta
-   real; la cifra exacta la da tu AFP/SCOMP"); REST/MCP/Web lo heredan. Registrar en
-   `docs/COMPLIANCE.md`.
-2. **Calibración (ADR-014):** fijar defaults citados — `tasa_rv` ← RV media Vejez (SP/CMF,
-   `tasasRentasVitalicias.php`, mensual); `tasa_descuento` ← TITRP 3,31% ene-2026
-   (`tasdescto.php`, cuatrimestral). Ambas son un solo número.
-3. **Web mínima (ADR-012):** frontend estático servido por la misma app FastAPI; consume
-   `POST /comparar`; traduce a lenguaje humano; saldo en pesos/UF. Ver `docs/EJEMPLO_MCP.md`
-   para el tono de la traducción.
-
-**Atajos:** el motor ya está (`application/comparar_modalidades.py::CompararModalidades`);
-la web solo lo consume vía REST. Ver `docs/AUDIT.md` (sign-offs) y `docs/CASES.md` (casos).
+**Atajos:** el contrato `TrayectoriaDeRiqueza` ya es la frontera; el `PuertoSimulador` ya genera
+trayectorias. Ver `docs/AUDIT.md` (sign-offs) y `docs/CASES.md` (casos).
 
 ## Documentación viva (SAD §12)
 

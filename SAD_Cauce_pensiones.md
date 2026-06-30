@@ -250,15 +250,22 @@ PerfilPrevisional  (UNIDAD ATÓMICA versionada e inmutable)
 
 ### 5.3 Capa MCP — herramientas expuestas
 
-| Herramienta MCP | Caso de uso que envuelve | Modo |
-|-----------------|--------------------------|------|
-| `comparar_modalidades(perfil_id)` | CompararModalidades (MVP) | lectura |
-| `explicar_comparacion(simulacion_id)` | ExplicarComparacion (qué riesgo domina) | lectura |
-| `metricas_pension(simulacion_id)` | Mesada esperada, percentiles, prob. agotamiento, herencia | lectura |
-| `simular_escenario(longevidad|retorno|tasa)` | SimularEscenario | simulación (sin efectos) |
-| `evaluar_senda(perfil_id)` | EvaluarSendaDePlaneo (fase 2) | lectura |
+| Herramienta MCP | Caso de uso que envuelve | Modo | Estado |
+|-----------------|--------------------------|------|--------|
+| `comparar_modalidades(edad, saldo_uf, genero)` | CompararModalidades (MVP) | lectura | ✅ Fase 3 |
+| `simular_escenario(retorno, inflación, tasa…)` | CompararModalidades con supuestos override | simulación (sin efectos) | ✅ Fase 3 |
+| `explicar_comparacion(simulacion_id)` | ExplicarComparacion (qué riesgo domina) | lectura | 🔲 diferida |
+| `metricas_pension(simulacion_id)` | Mesada, percentiles, prob. agotamiento, herencia | lectura | 🔲 diferida (el rastro no persiste métricas aún) |
+| `evaluar_senda(perfil_id)` | EvaluarSendaDePlaneo | lectura | 🔲 fase 4 |
 
-> **Decisión de seguridad y cumplimiento:** la capa MCP es **read-only + simulación**, y **toda salida incluye el disclaimer de no-asesoría**. No emite recomendaciones de modalidad ni inicia trámites. Coherente con Veredicto.
+> **Estado Fase 3 (entregado):** servidor `interfaces/mcp/server.py` con **FastMCP (stdio)**,
+> composition root análogo a la REST, exponiendo `comparar_modalidades` y `simular_escenario`.
+> `simular_escenario` recalcula sobre los **supuestos económicos que el motor soporta** (retorno,
+> inflación, tasas); la longevidad **no** es un parámetro libre sino la distribución de mortalidad
+> ya simulada — el riesgo de longevidad se reporta como atribución, no como un knob "+N años".
+> Las tres herramientas restantes quedan diferidas (requieren casos de uso/persistencia aún no construidos).
+
+> **Decisión de seguridad y cumplimiento:** la capa MCP es **read-only + simulación**, y **toda salida incluye el disclaimer de no-asesoría** (ADR-013). No emite recomendaciones de modalidad ni inicia trámites. El **caso borde C-22** se codifica en las `instructions` del servidor (el host recibe la regla de no recomendar y redirigir a AFP/asesor/SCOMP) y en el campo `no_recomendacion` de cada salida. Coherente con Veredicto.
 
 ---
 
