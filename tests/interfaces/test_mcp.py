@@ -32,7 +32,11 @@ def test_tools_registradas() -> None:
         async with Client(mcp) as cliente:
             return [t.name for t in await cliente.list_tools()]
 
-    assert set(asyncio.run(go())) == {"comparar_modalidades", "simular_escenario"}
+    assert set(asyncio.run(go())) == {
+        "comparar_modalidades",
+        "simular_escenario",
+        "proyectar_ciclo_vida",
+    }
 
 
 def test_comparar_lleva_disclaimer_y_no_recomendacion() -> None:
@@ -65,6 +69,21 @@ def test_simular_escenario_acepta_supuestos() -> None:
     d = _llamar("simular_escenario", args)
     assert d["entrada"]["supuestos"]["retorno_esperado"] == 0.01
     assert "NO constituye asesoría" in d["disclaimer"]
+
+
+def test_proyectar_ciclo_vida() -> None:
+    args = {
+        "edad_inicial": 25,
+        "edad_jubilacion": 65,
+        "genero": "F",
+        "cotizacion_anual_uf": 60,
+        "n_acumulacion": 500,
+        "n_desacumulacion": 250,
+    }
+    d = _llamar("proyectar_ciclo_vida", args)
+    assert [p["percentil"] for p in d["pensiones_por_percentil"]] == ["p10", "p50", "p90"]
+    assert "NO constituye asesoría" in d["disclaimer"]
+    assert "NO recomienda" in d["no_recomendacion"]
 
 
 def test_servidor_instruye_no_recomendar_c22() -> None:

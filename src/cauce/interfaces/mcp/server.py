@@ -18,13 +18,18 @@ from typing import Any
 from fastmcp import FastMCP
 
 from cauce.application.comparar_modalidades import CompararModalidades, ResultadoComparacion
+from cauce.application.proyectar_acumulacion import ProyectarAcumulacion
+from cauce.application.simular_ciclo_de_vida import ResultadoCicloDeVida, SimularCicloDeVida
 from cauce.domain.entities.modalidad import Modalidad
+from cauce.domain.entities.perfil_acumulacion import PerfilAcumulacion
 from cauce.domain.entities.perfil_previsional import PerfilPrevisional
 from cauce.domain.entities.persona import Persona
+from cauce.domain.entities.senda_planeo import SendaDePlaneo
 from cauce.domain.value_objects.edad import Edad
 from cauce.domain.value_objects.genero import Genero
 from cauce.domain.value_objects.saldo import SaldoPrevisional
 from cauce.domain.value_objects.supuestos import Supuestos
+from cauce.domain.value_objects.supuestos_acumulacion import SupuestosAcumulacion
 from cauce.infrastructure.calibracion.tasas_reguladas import (
     TASA_DESCUENTO_RP,
     TASA_DESCUENTO_RP_FUENTE,
@@ -34,6 +39,7 @@ from cauce.infrastructure.calibracion.tasas_reguladas import (
 from cauce.infrastructure.mortalidad.adaptador import AdaptadorMortalidad
 from cauce.infrastructure.persistencia.memoria import RepositorioSimulacionesMemoria
 from cauce.infrastructure.retornos.parametrico import GeneradorRetornosParametrico
+from cauce.infrastructure.simulacion.acumulacion import SimuladorAcumulacion
 from cauce.infrastructure.simulacion.montecarlo import SimuladorMonteCarlo
 from cauce.infrastructure.tarificacion.conmutacion import TarificadorConmutacion
 
@@ -98,17 +104,7 @@ def _construir_perfil(
 def _formatear(
     edad: int, saldo_uf: Decimal, genero: str, supuestos: Supuestos, res: ResultadoComparacion
 ) -> dict[str, Any]:
-    modalidades = [
-        {
-            "modalidad": mod.value,
-            "nombre": _NOMBRE[mod],
-            "mesada_inicial_uf": round(float(m.mesada_inicial_uf), 2),
-            "evolucion": _evolucion(m.erosion_mediana),
-            "herencia_esperada_uf": round(float(m.herencia_esperada_uf), 1),
-            "riesgo_dominante": m.riesgo_dominante,
-        }
-        for mod, m in res.metricas_por_modalidad.items()
-    ]
+    modalidades = _modalidades_payload(res)
     return {
         "entrada": {
             "edad": edad,
@@ -129,6 +125,42 @@ def _formatear(
     }
 
 
+def _modalidades_payload(res: ResultadoComparacion) -> list[dict[str, Any]]:
+    return [
+        {
+            "modalidad": mod.value,
+            "nombre": _NOMBRE[mod],
+            "mesada_inicial_uf": round(float(m.mesada_inicial_uf), 2),
+            "evolucion": _evolucion(m.erosion_mediana),
+            "herencia_esperada_uf": round(float(m.herencia_esperada_uf), 1),
+            "riesgo_dominante": m.riesgo_dominante,
+        }
+        for mod, m in res.metricas_por_modalidad.items()
+    ]
+
+
+def _formatear_ciclo(res: ResultadoCicloDeVida) -> dict[str, Any]:
+    m = res.acumulacion
+    return {
+        "acumulacion_saldo_a_jubilacion_uf": {
+            "p10": round(float(m.saldo_p10_uf)),
+            "p50": round(float(m.saldo_p50_uf)),
+            "p90": round(float(m.saldo_p90_uf)),
+            "esperado": round(float(m.saldo_esperado_uf)),
+        },
+        "pensiones_por_percentil": [
+            {
+                "percentil": p.percentil,
+                "saldo_uf": round(float(p.saldo_uf)),
+                "modalidades": _modalidades_payload(p.comparacion),
+            }
+            for p in res.pensiones
+        ],
+        "no_recomendacion": _NO_RECOMENDACION,
+        "disclaimer": res.disclaimer,
+    }
+
+
 def crear_servidor(directorio_mortalidad: Path = DIR_MORTALIDAD) -> FastMCP:
     """Arma el servidor MCP cableando los adaptadores reales sobre el caso de uso."""
     simulador = SimuladorMonteCarlo(
@@ -137,6 +169,7 @@ def crear_servidor(directorio_mortalidad: Path = DIR_MORTALIDAD) -> FastMCP:
         TarificadorConmutacion(),
     )
     caso_uso = CompararModalidades(simulador, RepositorioSimulacionesMemoria())
+    ciclo_uso = SimularCicloDeVida(ProyectarAcumulacion(SimuladorAcumulacion()), caso_uso)
     mcp: FastMCP = FastMCP("cauce", instructions=INSTRUCCIONES)
 
     def _comparar(
@@ -205,6 +238,79 @@ def crear_servidor(directorio_mortalidad: Path = DIR_MORTALIDAD) -> FastMCP:
             tasa_rv=Decimal(str(tasa_rv)),
         )
         return _comparar(edad, Decimal(str(saldo_uf)), genero, supuestos, n_trayectorias)
+
+    @mcp.tool
+    def proyectar_ciclo_vida(
+        edad_inicial: int,
+        edad_jubilacion: int,
+        genero: str,
+        cotizacion_anual_uf: float,
+        saldo_inicial_uf: float = 0.0,
+        w_joven: float = 0.9,
+        w_final: float = 0.2,
+        sensibilidad_riqueza: float = 0.5,
+        n_acumulacion: int = 5000,
+        n_desacumulacion: int = 3000,
+    ) -> dict[str, Any]:
+        """Ciclo de vida completo: de la cotización a la mesada (Fase 4).
+
+        Proyecta la acumulación con un glide path que depende de edad Y riqueza (ADR-015) y
+        compara modalidades para tres saldos representativos a la jubilación (p10/p50/p90) →
+        un rango de pensiones según cómo le vaya al ahorro. Supuestos de des-acumulación
+        calibrados (SP/CMF). No recomienda: redirige la decisión a la AFP/asesor/SCOMP.
+
+        Args:
+            edad_inicial: edad al empezar a cotizar (años).
+            edad_jubilacion: edad de jubilación (años).
+            genero: 'M'/'Hombre' o 'F'/'Mujer'.
+            cotizacion_anual_uf: aporte anual en UF.
+            saldo_inicial_uf: saldo ya acumulado, en UF (default 0).
+            w_joven: fracción en activo riesgoso al inicio (0..1).
+            w_final: fracción en activo riesgoso a la jubilación (0..1).
+            sensibilidad_riqueza: 0 = glide clásico por edad; >0 = ajuste por riqueza.
+            n_acumulacion: escenarios Monte Carlo de acumulación (default 5000).
+            n_desacumulacion: escenarios de des-acumulación por percentil (default 3000).
+        """
+        senda = SendaDePlaneo(
+            nombre="perfil",
+            edad_inicial=edad_inicial,
+            edad_jubilacion=edad_jubilacion,
+            w_joven=w_joven,
+            w_final=w_final,
+            sensibilidad_riqueza=sensibilidad_riqueza,
+        )
+        perfil = PerfilAcumulacion(
+            id="mcp-ciclo",
+            version=1,
+            genero=_genero(genero),
+            edad_inicial=Edad(edad_inicial),
+            edad_jubilacion=Edad(edad_jubilacion),
+            saldo_inicial=SaldoPrevisional(Decimal(str(saldo_inicial_uf))),
+            cotizacion_anual=SaldoPrevisional(Decimal(str(cotizacion_anual_uf))),
+            senda=senda,
+            supuestos=SupuestosAcumulacion(
+                retorno_riesgoso=Decimal("0.05"),
+                volatilidad_riesgosa=Decimal("0.16"),
+                retorno_seguro=Decimal("0.01"),
+            ),
+            semilla=42,
+        )
+        sup_desac = Supuestos(
+            retorno_esperado=Decimal("0.03"),
+            volatilidad=Decimal("0.10"),
+            inflacion=Decimal("0.03"),
+            tasa_descuento=TASA_DESCUENTO_RP,
+            tasa_rv=TASA_RV_VEJEZ,
+        )
+        res = ciclo_uso.ejecutar(
+            perfil,
+            sup_desac,
+            "2020",
+            [Modalidad.RETIRO_PROGRAMADO, Modalidad.RV_INMEDIATA],
+            n_acumulacion,
+            n_desacumulacion,
+        )
+        return _formatear_ciclo(res)
 
     return mcp
 

@@ -122,7 +122,7 @@ graph LR
 - Simular por Monte Carlo la **TrayectoriaDeRiqueza** de una persona (saldo + edad) bajo supuestos de retorno, inflación y mortalidad.
 - **(MVP)** Proyectar y **comparar las modalidades de pensión del SCOMP** — retiro programado, renta vitalicia inmediata, renta temporal con renta vitalicia diferida, renta vitalicia inmediata con retiro programado — modelando longevidad y secuencia de retornos.
 - Cuantificar y explicar qué **riesgo domina** cada modalidad (longevidad, mercado, herencia, irrevocabilidad).
-- **(Fase 2)** Diseñar/evaluar una **SendaDePlaneo** de fondo generacional según edad **y riqueza acumulada**.
+- **(Fase 4)** Diseñar/evaluar una **SendaDePlaneo** de fondo generacional según edad **y riqueza acumulada** (ADR-015) y simular el **ciclo de vida completo** (acumulación → des-acumulación) sobre el mismo núcleo.
 - Versionar el **PerfilPrevisional** (persona + supuestos) de forma inmutable y persistir un **snapshot** para reproducir comparaciones.
 - Exponer consulta, explicación y simulación —en modo lectura/simulación— vía MCP.
 - **(Orientación familiar)** Ofrecer una **web mínima de cero instalación** sobre la REST: una persona no técnica ingresa edad, saldo y género y recibe la comparación **traducida a lenguaje humano** (sin UF crudas ni jerga), con el disclaimer visible. Su fin es **orientar y preparar** una conversación informada con la AFP/SCOMP, no reemplazarla.
@@ -209,23 +209,27 @@ domain/
 │   ├── edad.py               # edad / horizonte de vida
 │   ├── saldo.py              # saldo previsional (UF)
 │   ├── mesada.py             # monto mensual de pensión (UF)
-│   ├── supuestos.py          # retorno, inflación, tasa de descuento
+│   ├── supuestos.py          # retorno, inflación, tasa de descuento (des-acumulación)
+│   ├── supuestos_acumulacion.py # activo riesgoso/seguro para el glide (Fase 4)
 │   └── genero.py             # relevante para mortalidad y compensación EV
 ├── entities/
 │   ├── persona.py            # afiliado: edad, saldo, género, beneficiarios
 │   ├── trayectoria_riqueza.py# CONTRATO compartido: saldo+edad en el tiempo
 │   ├── modalidad.py          # RETIRO_PROGRAMADO | RV_INMEDIATA | RT_RV_DIFERIDA | RV_INM_CON_RP
-│   ├── senda_planeo.py       # glide path: mezcla de riesgo por edad+riqueza (fase 2)
+│   ├── senda_planeo.py       # glide path por edad+riqueza (ADR-015, Fase 4)
 │   ├── perfil_previsional.py # persona + supuestos (UNIDAD versionada)
+│   ├── perfil_acumulacion.py # persona-en-formación + cotización + glide (Fase 4)
 │   └── rastro.py             # RastroSimulacion: modelo, mortalidad, semilla, atribución
 ├── services/                 # PUROS: evalúan trayectorias ya simuladas (stdlib)
 │   ├── comparador_modalidades.py # contrasta modalidades sobre trayectorias (MVP)
-│   ├── senda_planeo.py       # evalúa glide path (fase 2)
+│   ├── senda_planeo.py       # curva glide por edad (explicabilidad, Fase 4)
+│   ├── metricas_acumulacion.py # distribución del saldo a la jubilación (p10/p50/p90)
 │   └── metricas.py           # mesada esperada, percentiles, prob. de agotamiento, herencia
 └── ports/
     ├── repositorio_simulaciones.py
     ├── repositorio_perfiles.py
     ├── puerto_simulador.py      # genera TrayectoriaDeRiqueza por Monte Carlo (impl. NumPy en infra)
+    ├── puerto_simulador_acumulacion.py # genera trayectorias de acumulación (Fase 4)
     ├── puerto_mortalidad.py     # tablas reguladas | sintética — firma admite estado-de-hogar (ADR-011)
     ├── puerto_retornos.py       # proceso de mercado (bootstrap | paramétrico | escenarios) (ADR-007)
     └── puerto_tarificador.py    # tarificación tipo SCOMP de la renta vitalicia
@@ -254,6 +258,7 @@ PerfilPrevisional  (UNIDAD ATÓMICA versionada e inmutable)
 |-----------------|--------------------------|------|--------|
 | `comparar_modalidades(edad, saldo_uf, genero)` | CompararModalidades (MVP) | lectura | ✅ Fase 3 |
 | `simular_escenario(retorno, inflación, tasa…)` | CompararModalidades con supuestos override | simulación (sin efectos) | ✅ Fase 3 |
+| `proyectar_ciclo_vida(edad_inicial, cotización…)` | SimularCicloDeVida (acumulación → rango de pensiones) | simulación | ✅ Fase 4 |
 | `explicar_comparacion(simulacion_id)` | ExplicarComparacion (qué riesgo domina) | lectura | 🔲 diferida |
 | `metricas_pension(simulacion_id)` | Mesada, percentiles, prob. agotamiento, herencia | lectura | 🔲 diferida (el rastro no persiste métricas aún) |
 | `evaluar_senda(perfil_id)` | EvaluarSendaDePlaneo | lectura | 🔲 fase 4 |
@@ -298,9 +303,9 @@ sequenceDiagram
 
 Dos pasos críticos, idénticos en espíritu a Veredicto: **fijar la versión de perfil** y **persistir el snapshot** (supuestos y mortalidad as-seen) — sin él, la comparación no es reproducible ni auditable (ADR-004).
 
-### 6.2 Continuidad acumulación → des-acumulación (fase 2)
+### 6.2 Continuidad acumulación → des-acumulación (Fase 4, ✅)
 
-El módulo de acumulación produce una `TrayectoriaDeRiqueza` que termina en un saldo a la edad de jubilación; ese saldo es exactamente el insumo del comparador de modalidades. **El mismo núcleo, el mismo contrato:** se enchufa sin tocar la des-acumulación. Esta es la prueba de que el diseño modular paga — y el momento "wow" del portafolio: una sola simulación que recorre la vida entera, de los 25 a la mesada.
+El `SimuladorAcumulacion` produce trayectorias que terminan en el saldo a la edad de jubilación; ese saldo es exactamente el insumo del comparador de modalidades. **El mismo núcleo, el mismo contrato (`TrayectoriaDeRiqueza`):** se enchufó sin tocar la des-acumulación. El caso de uso `SimularCicloDeVida` toma tres saldos representativos de la acumulación (**p10/p50/p90**) y compara modalidades para cada uno, entregando un **rango de pensiones** según cómo le vaya al ahorro. Es el momento "wow" del portafolio: una sola simulación que recorre la vida entera, de los 25 a la mesada, expuesta por REST (`/ciclo-vida`) y MCP (`proyectar_ciclo_vida`).
 
 ---
 
@@ -373,6 +378,8 @@ graph TD
 
 **ADR-014 — Calibración de supuestos con tasas públicas reguladas (SP/CMF); sigue sin replicar el SCOMP.** *Contexto:* la tarificación paramétrica (ADR-003, §11) usaba supuestos de tasa arbitrarios. Existen dos series **públicas y reguladas** que mapean 1:1 a los levers del motor, sin acceso al SCOMP por persona. *Decisión:* `tasa_rv` se calibra con la **Tasa de Interés Media de las Rentas Vitalicias** (columna Vejez, mensual, publicada por la SP con fuente CMF — `spensiones.cl/apps/tasas/tasasRentasVitalicias.php`); `tasa_descuento` con la **Tasa de Interés Técnica del Retiro Programado (TITRP)** (valor único, actualización cuatrimestral; 3,31% desde enero 2026 — `spensiones.cl/apps/tasas/tasdescto.php`). Ambas son **un solo número**: se fijan como defaults citados en el código y se actualizan manualmente (TITRP ~3×/año, RV mensual). *Consecuencia:* la **magnitud** de la mesada queda anclada al promedio de mercado del período en vez de a un supuesto arbitrario; **no** son ofertas personales —siguen siendo promedios de mercado— por lo que el disclaimer (ADR-013) y la redirección al SCOMP se mantienen sin cambios.
 
+**ADR-015 — Glide path dependiente de edad *y* riqueza; paramétrico, no optimizado.** *Contexto:* la tesis del paper de origen (SAD §1.1) es que la trayectoria de riesgo de un fondo generacional debería depender de la edad **y** de la riqueza acumulada, no solo de la edad. *Decisión:* la `SendaDePlaneo` (dominio puro) fija la fracción riesgosa con dos componentes: un **backbone por edad** (interpolación lineal `w_joven → w_final`) y un **ajuste por riqueza** proporcional a la distancia respecto a una riqueza de referencia "on-track" (adelantado → menos riesgo para asegurar la meta; atrasado → más, acotado). Con `sensibilidad_riqueza = 0` la senda es la **clásica solo por edad** (baseline comparable). La generación de trayectorias vive en `infrastructure/simulacion/acumulacion.py` (NumPy, ADR-010); el dominio conserva la implementación pura de referencia. Es un modelo **paramétrico y determinista** (fijado por sus parámetros + semilla), **no** una optimización numérica — se descartó el solver `cvxpy` previsto en fase 2, por lo que su riesgo de no-determinismo (§11, ADR-006) **no aplica** a esta implementación. *Consecuencia:* el diferenciador intelectual del proyecto queda modelado y reproducible; la continuidad acumulación→des-acumulación (ADR-001) se realiza con saldo representativo + percentiles (p10/p50/p90 → rango de pensiones), sin reescribir ninguna de las dos mitades.
+
 ---
 
 ## 10. Requisitos de calidad
@@ -401,7 +408,7 @@ graph TD
 | Tasas calibradas desactualizadas (cambian en el tiempo) | Bajo | Defaults citados con fecha de fuente; TITRP cambia ~3×/año y RV es mensual — actualización manual trivial al ser un solo número (ADR-014) |
 | Anexo de tablas reguladas no descargable (rompe presupuesto USD 0) | Medio | Verificar disponibilidad pública antes de Fase 1; fallback a tabla sintética calibrada, declarado (ADR-003) |
 | Proceso de retornos iid subestima el riesgo de secuencia | Medio | Block bootstrap por defecto + paramétrico como baseline; proceso auditable (ADR-007) |
-| `cvxpy`/solver no bit-determinista entre versiones (fase 2) | Bajo | Reproducibilidad acotada al mismo entorno; solver y versión fijados; property-test de Fase 1 no cubre la senda optimizada (ADR-006) |
+| `cvxpy`/solver no bit-determinista entre versiones | Bajo | **No aplica al entregable:** el glide de Fase 4 es paramétrico/determinista, no optimizado con `cvxpy` (ADR-015). El riesgo reaparecería solo si una fase futura introdujera optimización numérica de la senda |
 
 **Deuda aceptada en el MVP:** sin nube, sin auth MCP (local), sin conexión al SCOMP real, módulo de acumulación diferido a fase 4, **tarificación paramétrica calibrada a promedios de mercado regulados pero no a ofertas personales del SCOMP** (ADR-014), **sin pensión de sobrevivencia (mortalidad de una vida, ADR-011)**. Documentado como fase posterior.
 
@@ -426,7 +433,7 @@ Cada fase termina con auditoría en `AUDIT.md` y sign-off.
 | **2 — MVP Des-acumulación** | Comparador de las 4 modalidades del SCOMP; tarificador paramétrico; riesgo de secuencia de retornos; atribución de riesgo; REST mínima; disclaimers | "Comparo retiro programado vs renta vitalicia para una persona y muestro qué riesgo asume en cada caso" |
 | **2.5 — Orientación familiar** | **(a)** Web mínima de cero instalación sobre la REST, traducida a lenguaje humano, saldo en pesos/UF (ADR-012); **(b)** disclaimer reforzado **en la fuente** —dominio/rastro— con encuadre paramétrico, heredado por REST/MCP/Web (ADR-013); **(c)** calibración de `tasa_rv` y `tasa_descuento` con tasas públicas SP/CMF (ADR-014) | "Mi familia abre un link, ve su comparación en lenguaje claro y llega a la AFP con preguntas concretas" |
 | **3 — Capa MCP** | Servidor MCP (stdio) read-only + simulación; Claude Desktop como host; disclaimer en cada salida | "Le pregunto a Claude qué pasa con mi pensión si vivo 5 años más" |
-| **4 — Módulo Acumulación** | SendaDePlaneo / fondo generacional según edad **y riqueza**; continuidad acumulación→des-acumulación sobre el mismo núcleo | "Una sola simulación de los 25 a la mesada: diseño el glide path y veo la pensión que produce" |
+| **4 — Módulo Acumulación** | ✅ SendaDePlaneo edad **y riqueza** (ADR-015) + SimuladorAcumulacion; casos de uso ProyectarAcumulacion y SimularCicloDeVida (p10/p50/p90 → rango de pensiones); REST `/ciclo-vida` + MCP `proyectar_ciclo_vida` | "Una sola simulación de los 25 a la mesada: diseño el glide path y veo la pensión que produce" |
 | **5 — Opcional** | Dashboard (trayectorias/percentiles), límite de riesgo vía CVaR, benchmark de fondos generacionales, MCP remoto + OAuth | Análisis de política / soporte a asesor sin reescribir |
 
 > **Recomendación de alcance:** fases 1–3 son el MVP de portafolio (des-acumulación completa con MCP). La **Fase 2.5 se prioriza antes que la 3** porque atiende el uso real que motiva el proyecto —que la familia se oriente sin instalar nada y llegue informada a la AFP— con bajo esfuerzo (reusa la REST y el motor). El MCP (Fase 3) aporta la capa conversacional y de portafolio sobre la misma base. La fase 4 es el momento "wow" (ciclo de vida completo) pero el proyecto **ya está completo y demostrable sin ella**. Profundo y angosto antes que ancho e inconcluso.

@@ -42,18 +42,18 @@ uv run ruff check .             # lint
 uv run ruff format .            # formato
 uv run mypy                     # tipos (--strict, configurado en pyproject)
 uv run lint-imports             # fronteras de capas (import-linter)
-uv run pytest                   # tests (53, verdes)
+uv run pytest                   # tests (67, verdes)
 docker compose up -d postgres   # base de datos local (deuda: persistencia real)
 ```
 
 ### Correr el MVP
 
 ```bash
-# REST + Web de orientación familiar (Fase 2/2.5)
+# REST + Web de orientación familiar (Fase 2/2.5) + ciclo de vida (Fase 4)
 uv run uvicorn cauce.interfaces.rest.app:app --port 8077
-#   → http://127.0.0.1:8077/ (web) · POST /comparar (RP vs RV + disclaimer)
+#   → http://127.0.0.1:8077/ (web) · POST /comparar (RP vs RV) · POST /ciclo-vida (25→mesada)
 
-# MCP para Claude Desktop (Fase 3, stdio): comparar_modalidades + simular_escenario
+# MCP para Claude Desktop (Fase 3/4, stdio): comparar_modalidades · simular_escenario · proyectar_ciclo_vida
 uv run python -m cauce.interfaces.mcp.server   # config en DEPLOY.md
 ```
 
@@ -65,29 +65,29 @@ uv run python -m cauce.interfaces.mcp.server   # config en DEPLOY.md
 | 1 — Núcleo de simulación | ✅ cerrada (mortalidad + retornos + simulador) |
 | 2 — MVP Des-acumulación | ✅ cerrada (tarificador + comparador RP/RV + REST) |
 | 2.5 — Orientación familiar | ✅ cerrada (web + disclaimer en la fuente + calibración SP/CMF, `053fdf1`) |
-| 3 — Capa MCP | ✅ cerrada (FastMCP stdio: comparar_modalidades + simular_escenario, 53 tests) |
-| 4 — Acumulación | **siguiente** |
+| 3 — Capa MCP | ✅ cerrada (FastMCP stdio: comparar_modalidades + simular_escenario) |
+| 4 — Acumulación | ✅ cerrada (glide path edad+riqueza + ciclo de vida completo, 67 tests) |
+| 5 — Opcional | pendiente (dashboard, CVaR, MCP remoto + OAuth) |
 
-## Retomar aquí — próximo: Fase 4 (módulo de acumulación)
+## Retomar aquí — próximo: Fase 5 (opcional) o pulido
 
-**Dónde estamos:** el MVP de des-acumulación está completo y demostrable por **tres canales
-hermanos** sobre el mismo `CompararModalidades`: REST, Web de orientación familiar (cero
-instalación) y MCP (Claude Desktop). Todo con mortalidad regulada validada, supuestos
-calibrados a tasas públicas SP/CMF, y disclaimer + guardrail C-22 en la fuente. 53 tests verdes.
+**Dónde estamos:** el **ciclo de vida completo** está implementado y demostrable — de los 25 a
+la mesada — por **canales hermanos** (REST, Web, MCP) sobre el mismo núcleo. 67 tests verdes;
+ruff/mypy/import-linter limpios. El proyecto está **completo y demostrable** (fases 1–4).
 
-**Fase 3 entregada:** `interfaces/mcp/server.py` (FastMCP stdio) expone `comparar_modalidades`
-y `simular_escenario`; el caso borde C-22 vive en las `instructions` del servidor y en el
-campo `no_recomendacion` de cada salida. `explicar_comparacion`/`metricas_pension`/`evaluar_senda`
-quedan diferidas (SAD §5.3). Config Claude Desktop en `DEPLOY.md`.
+**Fase 4 entregada (SAD §5.2/§6.2, ADR-015):**
+- `SendaDePlaneo` (dominio puro): glide path por **edad + riqueza** (backbone lineal por edad
+  + ajuste por distancia a la riqueza de referencia; `sensibilidad_riqueza=0` = clásica por edad).
+- `SimuladorAcumulacion` (infra NumPy, determinista): cotizaciones + retornos guiados por el glide.
+- Casos de uso `ProyectarAcumulacion` y `SimularCicloDeVida` (toma p10/p50/p90 del saldo a la
+  jubilación → compara modalidades → **rango de pensiones**).
+- Expuesto por REST `POST /ciclo-vida` y MCP `proyectar_ciclo_vida`. Disclaimer + C-22 heredados.
 
-**Plan de Fase 4** (el momento "wow": ciclo de vida completo, SAD §13): módulo de acumulación
-que produce una `TrayectoriaDeRiqueza` terminando en el saldo a la jubilación — exactamente el
-insumo del comparador. `SendaDePlaneo`/glide path de fondo generacional según edad **y riqueza**.
-Se enchufa sobre el mismo núcleo sin tocar la des-acumulación (ADR-001). El proyecto **ya está
-completo y demostrable sin la Fase 4**; es profundización, no requisito.
+**Nota de modelado:** el glide es **paramétrico y determinista**, no un optimizador `cvxpy`
+(ese riesgo de §11/ADR-006 no aplica). Continuidad por saldo representativo + percentiles.
 
-**Atajos:** el contrato `TrayectoriaDeRiqueza` ya es la frontera; el `PuertoSimulador` ya genera
-trayectorias. Ver `docs/AUDIT.md` (sign-offs) y `docs/CASES.md` (casos).
+**Si sigue Fase 5 (opcional, SAD §13):** dashboard de trayectorias/percentiles, límite de riesgo
+vía CVaR, benchmark de fondos generacionales, MCP remoto + OAuth. Ver `docs/AUDIT.md` · `docs/CASES.md`.
 
 ## Documentación viva (SAD §12)
 

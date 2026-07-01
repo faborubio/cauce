@@ -46,6 +46,28 @@ def test_web_orientacion_familiar_se_sirve(client: TestClient) -> None:
     assert "Compara tus modalidades de pensión" in r.text
 
 
+def test_ciclo_vida_ok(client: TestClient) -> None:
+    # Fase 4: acumulación (p10/p50/p90) → rango de pensiones + disclaimer.
+    r = client.post(
+        "/ciclo-vida",
+        json={
+            "edad_inicial": 25,
+            "edad_jubilacion": 65,
+            "genero": "M",
+            "cotizacion_anual_uf": "60",
+            "saldo_inicial_uf": "50",
+            "n_acumulacion": 800,
+            "n_desacumulacion": 300,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert [p["percentil"] for p in body["pensiones"]] == ["p10", "p50", "p90"]
+    a = body["acumulacion"]
+    assert float(a["saldo_p10_uf"]) <= float(a["saldo_p50_uf"]) <= float(a["saldo_p90_uf"])
+    assert "ilustrativos" in body["disclaimer"]
+
+
 def test_edad_bajo_rango_de_tabla_da_422(client: TestClient) -> None:
     # mujer de 18: bajo el rango de RV-2020-MUJERES (parte en 20) -> C-02
     r = client.post(

@@ -54,6 +54,35 @@
   (C-10/C-29) y bootstrap/crash (C-15/C-12). Declaradas en COMPLIANCE: C-05, C-31, C-30, C-23, C-20.
 - **Fase 2 CERRADA.** 47 tests. MVP = comparar RP vs RV por HTTP con disclaimer.
 
+## 2026-06-30 — Fases 2.5, 3 y 4 (una sesión)
+
+- **Giro de propósito (usuario):** el objetivo real es que su **familia** se oriente y llegue
+  informada a la AFP. Eso reordenó el trabajo: primero accesibilidad (web), luego lo demás.
+- **Fase 2.5 — Orientación familiar** (`053fdf1`):
+  - **Web de cero instalación** sobre la REST (ADR-012): HTML estático servido por la misma
+    FastAPI, traduce a lenguaje humano, saldo en UF o pesos. Cliente delgado, sin lógica.
+  - **Disclaimer en la fuente** (ADR-013): reforzado en `RastroSimulacion` con el encuadre
+    paramétrico; REST/MCP/Web lo heredan idéntico.
+  - **Calibración SP/CMF** (ADR-014): `tasa_descuento`=TITRP 3,31% (ene-2026), `tasa_rv`=RV
+    media Vejez 2,84% (may-2026), con fuente citada. Son promedios de mercado, no oferta SCOMP.
+  - **Bug atrapado por smoke test:** `erosion_mediana` es la *fracción que queda* (1.0=fija),
+    no "cuánto baja"; el texto de la web estaba invertido. Lección: verificar contra el dominio.
+- **Fase 3 — Capa MCP** (`f344136`): `interfaces/mcp/server.py` (FastMCP stdio), hermano de la
+  REST. Tools `comparar_modalidades` + `simular_escenario`. **C-22 estructural:** regla de
+  no-recomendar + redirigir en las `instructions` del servidor y en `no_recomendacion` de cada
+  salida. `simular_escenario` no expone la longevidad como knob "+N años" (vive en la mortalidad
+  ya simulada): honestidad. Diferidas: explicar/metricas/evaluar_senda.
+- **Fase 4 — Acumulación / ciclo de vida** (ADR-015):
+  - **Decisiones del usuario:** glide path por **edad + riqueza** (tesis del paper; baseline
+    solo-edad con `sensibilidad_riqueza=0`) y continuidad por **saldo representativo + percentiles**.
+  - `SendaDePlaneo` pura (backbone lineal por edad + ajuste por distancia a riqueza de referencia:
+    adelantado→menos riesgo). `SimuladorAcumulacion` (NumPy, determinista) mezcla activo
+    riesgoso/seguro según la fracción del glide.
+  - `SimularCicloDeVida`: p10/p50/p90 del saldo a la jubilación → comparar modalidades → **rango
+    de pensiones**. Expuesto por REST `/ciclo-vida` y MCP `proyectar_ciclo_vida`.
+  - El glide es **paramétrico/determinista**, no `cvxpy`: el riesgo de no-determinismo de §11 no
+    aplica. **67 tests verdes.** Fases 1–4 = proyecto completo y demostrable.
+
 ## Decisiones del SAD revisadas en esta sesión (review "vista de halcón")
 
 - **ADR-010** (nuevo): generación numérica en infraestructura; dominio solo evalúa.

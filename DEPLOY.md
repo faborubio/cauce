@@ -38,7 +38,8 @@ redirige a AFP/asesor/SCOMP). Para usarlo desde Claude Desktop, agregar en su
 ```
 
 Tras `uv sync` también queda el script `cauce-mcp` (equivalente a `uv run cauce-mcp`).
-Herramientas expuestas: `comparar_modalidades` y `simular_escenario` (SAD §5.3).
+Herramientas expuestas: `comparar_modalidades`, `simular_escenario` y `proyectar_ciclo_vida`
+(ciclo de vida completo, Fase 4) — SAD §5.3.
 
 ## Imagen Docker de la app
 
